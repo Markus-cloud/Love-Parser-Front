@@ -34,26 +34,26 @@ export default function Dashboard() {
       <div className="space-y-6 max-w-2xl mx-auto animate-slide-up">
         {/* User Profile Card */}
         <GlassCard>
-          <div className="flex items-center gap-4 mb-4">
-            <Avatar className="w-20 h-20 border-4 border-white/30">
+          <div className="flex items-start gap-4 mb-4">
+            <Avatar className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-white/30 flex-shrink-0">
               <AvatarImage src={user.photoUrl} />
               <AvatarFallback>{user.firstName[0]}</AvatarFallback>
             </Avatar>
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold">{user.firstName}</h2>
-              <p className="text-muted-foreground">{user.username}</p>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl sm:text-2xl font-bold">{user.firstName}</h2>
+              <p className="text-muted-foreground text-sm">{user.username}</p>
               <p className="text-xs text-muted-foreground mt-1">ID: {user.id}</p>
+              {user.hasSubscription ? (
+                <Badge className="bg-accent/20 text-accent border-accent/30 text-xs whitespace-nowrap mt-2 inline-flex">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Активна
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-muted text-xs whitespace-nowrap mt-2 inline-flex">
+                  Нет подписки
+                </Badge>
+              )}
             </div>
-            {user.hasSubscription ? (
-              <Badge className="bg-accent/20 text-accent border-accent/30 text-xs whitespace-nowrap">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Активна
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="border-muted text-xs whitespace-nowrap">
-                Нет подписки
-              </Badge>
-            )}
           </div>
 
           {!user.hasSubscription && (
