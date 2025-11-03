@@ -95,10 +95,10 @@ export default function Audience() {
             <Button onClick={handleParsing} disabled={isLoading} className="w-full bg-gradient-to-r from-accent to-primary hover:opacity-90 glow-effect mt-6">
               {isLoading ? <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Анализ...
+                  Поиск...
                 </> : <>
                   <Users className="w-4 h-4 mr-2" />
-                  Начать анализ
+                  Начать поиск
                 </>}
             </Button>
           </div>
