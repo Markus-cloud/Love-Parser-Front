@@ -131,9 +131,7 @@ export default function Audience() {
               Excel
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Начните анализ для получения данных
-          </p>
+          <p className="text-sm text-muted-foreground text-center py-4">Начните поиск для получения данных</p>
         </GlassCard>
       </div>
     </Layout>;
