@@ -1,7 +1,7 @@
 import { createServer } from "./server";
 
 import { config } from "@/config/config";
-import { bootstrapQueues } from "@/services/queue.service";
+import { bootstrapQueues, shutdownQueues } from "@/services/queue.service";
 import { ensureTelegramClient } from "@/services/telegram.service";
 import { connectDatastores, disconnectDatastores } from "@/utils/clients";
 import { logger } from "@/utils/logger";
@@ -39,6 +39,7 @@ async function start() {
       logger.info("Received shutdown signal", { signal });
       try {
         await server.close();
+        await shutdownQueues();
         await disconnectDatastores();
         logger.info("Cleanup complete, exiting process");
         process.exit(0);
@@ -57,6 +58,9 @@ async function start() {
     });
   } catch (error) {
     logger.error("Failed to start backend", { error });
+    await shutdownQueues().catch((queueError) => {
+      logger.error("Failed to stop queues after startup failure", { queueError });
+    });
     await disconnectDatastores().catch((disconnectError) => {
       logger.error("Failed to clean up resources after startup failure", { disconnectError });
     });

@@ -1,19 +1,26 @@
-import Queue from "bull";
-
-import { config } from "@/config/config";
+import { initializeQueues } from "@/queue/queueManager";
 import { logger } from "@/utils/logger";
+import { startWorkers, stopWorkers } from "@/workers";
 
-export const broadcastQueue = new Queue("broadcasts", config.redis.url);
+let queuesBootstrapped = false;
 
 export async function bootstrapQueues() {
-  broadcastQueue.process(async (job) => {
-    logger.debug("Processing broadcast job placeholder", { jobId: job.id });
-    return job.data;
-  });
+  if (queuesBootstrapped) {
+    return;
+  }
 
-  broadcastQueue.on("completed", (job) => {
-    logger.info("Broadcast job completed", { jobId: job.id });
-  });
+  await initializeQueues();
+  await startWorkers();
+  queuesBootstrapped = true;
+  logger.info("Redis and Bull queues bootstrapped");
+}
 
-  logger.info("Queues bootstrapped");
+export async function shutdownQueues() {
+  if (!queuesBootstrapped) {
+    return;
+  }
+
+  await stopWorkers();
+  queuesBootstrapped = false;
+  logger.info("Queues shutdown complete");
 }
