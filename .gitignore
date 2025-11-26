@@ -10,6 +10,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+pnpm-lock.yaml
+frontend/.env
+backend/.env
 *.local
 
 # Editor directories and files
