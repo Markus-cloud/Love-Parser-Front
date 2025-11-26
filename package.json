@@ -10,7 +10,8 @@
     "build": "npm run build --prefix frontend",
     "build:frontend": "pnpm --filter @love-parser/frontend build",
     "lint": "pnpm --filter @love-parser/frontend lint",
-    "test:backend": "pnpm --filter @love-parser/backend test"
+    "test:backend": "pnpm --filter @love-parser/backend test",
+    "postinstall": "npm install --prefix backend --package-lock=false && npm install --prefix frontend --package-lock=false"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

@@ -1,41 +1,65 @@
-import Fastify from "fastify";
-import cors from "fastify-cors";
-import fastifyJwt from "fastify-jwt";
-import helmet from "@fastify/helmet";
+import { createServer } from "./server";
 
-import { registerHealthRoutes } from "@routes/health";
-import { bootstrapQueues } from "@services/queue.service";
-import { ensureTelegramClient } from "@services/telegram.service";
-import { connectDatastores } from "@utils/clients";
-import { env } from "@utils/env";
-import { logger } from "@utils/logger";
-
-async function buildServer() {
-  const app = Fastify({ logger: false });
-
-  await app.register(cors, { origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN, credentials: true });
-  await app.register(helmet);
-  await app.register(fastifyJwt, { secret: env.JWT_SECRET });
-
-  await app.register(registerHealthRoutes, { prefix: "/api" });
-
-  return app;
-}
+import { config } from "@/config/config";
+import { bootstrapQueues } from "@/services/queue.service";
+import { ensureTelegramClient } from "@/services/telegram.service";
+import { connectDatastores, disconnectDatastores } from "@/utils/clients";
+import { logger } from "@/utils/logger";
 
 async function start() {
   try {
     await connectDatastores();
     await bootstrapQueues();
 
-    if (env.TELEGRAM_API_ID && env.TELEGRAM_API_HASH) {
+    if (config.telegram.apiId && config.telegram.apiHash) {
       await ensureTelegramClient();
     }
 
-    const server = await buildServer();
-    await server.listen({ port: env.PORT, host: "0.0.0.0" });
-    logger.info(`Backend listening on http://localhost:${env.PORT}`);
+    const server = await createServer();
+    const desiredPort = config.server.port;
+    const fallbackPort = desiredPort === 3000 ? 3001 : undefined;
+    let activePort = desiredPort;
+
+    try {
+      await server.listen({ port: desiredPort, host: config.server.host });
+    } catch (listenError) {
+      const errorWithCode = listenError as NodeJS.ErrnoException;
+      if (errorWithCode.code === "EADDRINUSE" && fallbackPort) {
+        logger.warn(`Port ${desiredPort} is in use, falling back to ${fallbackPort}`);
+        activePort = fallbackPort;
+        await server.listen({ port: fallbackPort, host: config.server.host });
+      } else {
+        throw listenError;
+      }
+    }
+
+    logger.info(`Backend listening on http://${config.server.host}:${activePort}`);
+
+    const shutdown = async (signal?: string) => {
+      logger.info("Received shutdown signal", { signal });
+      try {
+        await server.close();
+        await disconnectDatastores();
+        logger.info("Cleanup complete, exiting process");
+        process.exit(0);
+      } catch (error) {
+        logger.error("Failed to gracefully shut down", { error });
+        process.exit(1);
+      }
+    };
+
+    process.once("SIGINT", () => {
+      void shutdown("SIGINT");
+    });
+
+    process.once("SIGTERM", () => {
+      void shutdown("SIGTERM");
+    });
   } catch (error) {
     logger.error("Failed to start backend", { error });
+    await disconnectDatastores().catch((disconnectError) => {
+      logger.error("Failed to clean up resources after startup failure", { disconnectError });
+    });
     process.exit(1);
   }
 }

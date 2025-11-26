@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 
-import { closeDatabasePool, getDatabasePool, initializeDatabase } from "@database/connection";
-import { logger } from "@utils/logger";
+import { closeDatabasePool, getDatabasePool, initializeDatabase } from "@/database/connection";
+import { logger } from "@/utils/logger";
 
 config();
 
