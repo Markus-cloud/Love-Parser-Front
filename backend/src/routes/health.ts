@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 
-import { pgPool, redisClient } from "@/utils/clients";
+import { checkRedisHealth } from "@/services/redis.service";
+import { pgPool } from "@/utils/clients";
 import { ServiceUnavailableError } from "@/utils/errors";
 
 const now = () => new Date().toISOString();
@@ -17,14 +18,12 @@ async function ensureDatabaseHealthy() {
 }
 
 async function ensureRedisHealthy() {
-  try {
-    await redisClient.ping();
-    return { status: "ok" as const };
-  } catch (error) {
-    throw new ServiceUnavailableError("Redis is unavailable", {
-      details: { cause: (error as Error).message },
-    });
+  const healthy = await checkRedisHealth();
+  if (!healthy) {
+    throw new ServiceUnavailableError("Redis is unavailable");
   }
+
+  return { status: "ok" as const };
 }
 
 export async function registerHealthRoutes(app: FastifyInstance) {

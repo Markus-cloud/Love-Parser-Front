@@ -21,7 +21,10 @@
       "@/utils/*": ["utils/*"],
       "@/types/*": ["types/*"],
       "@/config/*": ["config/*"],
-      "@/database/*": ["database/*"]
+      "@/database/*": ["database/*"],
+      "@/jobs/*": ["jobs/*"],
+      "@/queue/*": ["queue/*"],
+      "@/workers/*": ["workers/*"]
     },
     "noUnusedLocals": false,
     "noUnusedParameters": false
