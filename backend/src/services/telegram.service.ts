@@ -1,16 +1,17 @@
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
-import { env } from "@utils/env";
+
+import { config } from "@/config/config";
 
 let telegramClient: TelegramClient | null = null;
 
 function createTelegramClient() {
-  if (!env.TELEGRAM_API_ID || !env.TELEGRAM_API_HASH) {
+  if (!config.telegram.apiId || !config.telegram.apiHash) {
     throw new Error("Telegram credentials are not configured");
   }
 
-  const session = new StringSession(env.TELEGRAM_SESSION);
-  telegramClient = new TelegramClient(session, env.TELEGRAM_API_ID, env.TELEGRAM_API_HASH, {
+  const session = new StringSession(config.telegram.session);
+  telegramClient = new TelegramClient(session, config.telegram.apiId, config.telegram.apiHash, {
     connectionRetries: 5,
   });
 

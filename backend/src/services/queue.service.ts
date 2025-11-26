@@ -1,8 +1,9 @@
 import Queue from "bull";
-import { env } from "@utils/env";
-import { logger } from "@utils/logger";
 
-export const broadcastQueue = new Queue("broadcasts", env.REDIS_URL);
+import { config } from "@/config/config";
+import { logger } from "@/utils/logger";
+
+export const broadcastQueue = new Queue("broadcasts", config.redis.url);
 
 export async function bootstrapQueues() {
   broadcastQueue.process(async (job) => {

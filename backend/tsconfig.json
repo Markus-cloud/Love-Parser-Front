@@ -14,12 +14,14 @@
     "types": ["node", "vitest"],
     "baseUrl": "./src",
     "paths": {
-      "@services/*": ["services/*"],
-      "@routes/*": ["routes/*"],
-      "@models/*": ["models/*"],
-      "@middleware/*": ["middleware/*"],
-      "@utils/*": ["utils/*"],
-      "@database/*": ["database/*"]
+      "@/services/*": ["services/*"],
+      "@/routes/*": ["routes/*"],
+      "@/models/*": ["models/*"],
+      "@/middleware/*": ["middleware/*"],
+      "@/utils/*": ["utils/*"],
+      "@/types/*": ["types/*"],
+      "@/config/*": ["config/*"],
+      "@/database/*": ["database/*"]
     },
     "noUnusedLocals": false,
     "noUnusedParameters": false

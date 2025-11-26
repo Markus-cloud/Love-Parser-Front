@@ -1,13 +1,13 @@
 import { Pool } from "pg";
 
-import { env } from "@utils/env";
-import { logger } from "@utils/logger";
+import { config } from "@/config/config";
+import { logger } from "@/utils/logger";
 
 let pool: Pool | null = null;
 
 function createPool(): Pool {
   const createdPool = new Pool({
-    connectionString: env.DATABASE_URL,
+    connectionString: config.database.url,
     max: 20,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
