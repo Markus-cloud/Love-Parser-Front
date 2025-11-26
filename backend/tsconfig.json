@@ -18,7 +18,8 @@
       "@routes/*": ["routes/*"],
       "@models/*": ["models/*"],
       "@middleware/*": ["middleware/*"],
-      "@utils/*": ["utils/*"]
+      "@utils/*": ["utils/*"],
+      "@database/*": ["database/*"]
     },
     "noUnusedLocals": false,
     "noUnusedParameters": false

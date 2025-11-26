@@ -41,14 +41,14 @@ services:
     env_file:
       - .env
     environment:
-      POSTGRES_URL: ${POSTGRES_URL:-postgresql://love_parser:love_parser@postgres:5432/love_parser}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://love_parser:love_parser@postgres:5432/love_parser}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
     ports:
       - "3000:3000"
     volumes:
       - ..:/workspace
     command: >
-      sh -c "corepack enable && pnpm install && pnpm --filter @love-parser/backend dev"
+      sh -c "corepack enable && pnpm install && pnpm --filter @love-parser/backend db:migrate && pnpm --filter @love-parser/backend dev"
 
 volumes:
   postgres-data:
