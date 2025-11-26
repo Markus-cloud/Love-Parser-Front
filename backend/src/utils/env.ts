@@ -8,6 +8,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   CORS_ORIGIN: z.string().default("*"),
   JWT_SECRET: z.string().min(10).default("changeme-secret"),
+  DATABASE_URL: z.string().url().optional(),
   POSTGRES_URL: z.string().url().default("postgresql://love_parser:love_parser@localhost:5432/love_parser"),
   REDIS_URL: z.string().url().default("redis://localhost:6379"),
   TELEGRAM_API_ID: z.coerce.number().default(0),
@@ -15,4 +16,9 @@ const envSchema = z.object({
   TELEGRAM_SESSION: z.string().default(""),
 });
 
-export const env = envSchema.parse(process.env);
+const parsedEnv = envSchema.parse(process.env);
+
+export const env = {
+  ...parsedEnv,
+  DATABASE_URL: parsedEnv.DATABASE_URL ?? parsedEnv.POSTGRES_URL,
+};
