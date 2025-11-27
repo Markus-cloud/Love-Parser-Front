@@ -125,10 +125,19 @@ async function seed() {
     );
 
     await client.query(
-      `INSERT INTO audience_segments (id, user_id, name, description, filters)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO audience_segments (id, user_id, name, description, filters, source_parsing_id, total_recipients, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (user_id, name) DO NOTHING`,
-      [ids.segment, ids.user, "Warm Leads", "Active community managers", JSON.stringify({ region: "RU" })],
+      [
+        ids.segment,
+        ids.user,
+        "Warm Leads",
+        "Active community managers",
+        JSON.stringify({ region: "RU" }),
+        ids.parsingHistory,
+        1280,
+        "ready",
+      ],
     );
 
     await client.query(

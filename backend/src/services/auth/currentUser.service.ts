@@ -22,6 +22,7 @@ const LIMIT_KEY_ALIASES: Record<string, string> = {
   parsing_channels: "parsing",
   audience_searches: "audience",
   audience_exports: "audience",
+  audience_segments: "audience",
   broadcast_messages: "broadcast",
   broadcast_campaigns: "broadcast",
 };

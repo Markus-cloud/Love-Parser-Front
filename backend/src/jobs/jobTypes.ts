@@ -1,3 +1,4 @@
+import { AudienceSegmentJob } from "@/jobs/audienceJob";
 import { BroadcastJob } from "@/jobs/broadcastJob";
 import { CleanupDataJob } from "@/jobs/cleanupDataJob";
 import { NotificationJob } from "@/jobs/notificationJob";
@@ -8,6 +9,7 @@ export enum JobTypes {
   BROADCAST = "broadcast",
   NOTIFICATION = "notification",
   CLEANUP_DATA = "cleanup-data",
+  AUDIENCE_SEGMENT = "audience-segment",
 }
 
 export type JobPayloadMap = {
@@ -15,6 +17,7 @@ export type JobPayloadMap = {
   [JobTypes.BROADCAST]: BroadcastJob;
   [JobTypes.NOTIFICATION]: NotificationJob;
   [JobTypes.CLEANUP_DATA]: CleanupDataJob;
+  [JobTypes.AUDIENCE_SEGMENT]: AudienceSegmentJob;
 };
 
 export type JobPayload<T extends JobTypes> = JobPayloadMap[T];
