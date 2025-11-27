@@ -1,6 +1,7 @@
 import { pgPool } from "@/utils/clients";
 import { NotFoundError, ValidationError } from "@/utils/errors";
 import { User, UserProfile, UserStatus } from "@/types/user";
+import { invalidateDashboardCache } from "@/services/dashboard/dashboard.service";
 
 interface UserRow {
   id: string;
@@ -80,7 +81,9 @@ export async function createUser(input: CreateUserInput): Promise<User> {
     ],
   );
 
-  return mapUserRow(result.rows[0]);
+  const createdUser = mapUserRow(result.rows[0]);
+  await invalidateDashboardCache(createdUser.id);
+  return createdUser;
 }
 
 export async function getUserById(id: string): Promise<User | null> {
@@ -141,7 +144,9 @@ export async function updateUserProfile(userId: string, updates: UpdateUserProfi
     throw new NotFoundError("User not found", { userId });
   }
 
-  return mapUserRow(result.rows[0]);
+  const updatedUser = mapUserRow(result.rows[0]);
+  await invalidateDashboardCache(userId);
+  return updatedUser;
 }
 
 export async function updateTelegramProfile(userId: string, updates: UpdateTelegramProfileInput): Promise<User> {
@@ -192,7 +197,9 @@ export async function updateTelegramProfile(userId: string, updates: UpdateTeleg
     throw new NotFoundError("User not found", { userId });
   }
 
-  return mapUserRow(result.rows[0]);
+  const updatedUser = mapUserRow(result.rows[0]);
+  await invalidateDashboardCache(userId);
+  return updatedUser;
 }
 
 export async function ensureFreeSubscription(userId: string) {
@@ -206,6 +213,8 @@ export async function ensureFreeSubscription(userId: string) {
      VALUES ($1, $2, $3, 'active', NOW(), NOW() + INTERVAL '30 days', $4)`,
     [userId, FREE_PLAN_CODE, FREE_PLAN_NAME, JSON.stringify({ source: "telegram-auth" })],
   );
+
+  await invalidateDashboardCache(userId);
 }
 
 export async function ensureDefaultUsageLimits(userId: string) {
@@ -219,4 +228,6 @@ export async function ensureDefaultUsageLimits(userId: string) {
       ),
     ),
   );
+
+  await invalidateDashboardCache(userId);
 }
