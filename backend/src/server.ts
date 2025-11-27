@@ -11,6 +11,7 @@ import { rateLimitMiddleware } from "@/middleware/rateLimitMiddleware";
 import { registerRequestLogger } from "@/middleware/requestLogger";
 import { registerHealthRoutes } from "@/routes/health";
 import { registerTelegramAuthRoutes } from "@/routes/telegramAuth";
+import { registerAuthRoutes } from "@/routes/auth";
 
 function getRequestId(headers: Record<string, string | string[] | undefined>) {
   const headerValue = headers[config.server.requestIdHeader] ?? headers["x-request-id"];
@@ -47,6 +48,7 @@ export async function createServer(): Promise<FastifyInstance> {
 
   await app.register(registerHealthRoutes, { prefix: "/api" });
   await app.register(registerTelegramAuthRoutes, { prefix: "/api/v1/telegram/auth" });
+  await app.register(registerAuthRoutes, { prefix: "/api/v1/auth" });
 
   return app;
 }
