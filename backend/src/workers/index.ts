@@ -1,4 +1,5 @@
 import { JobTypes } from "@/jobs/jobTypes";
+import { handleAudienceJob } from "@/queue/jobHandlers/audience.handler";
 import { handleBroadcastJob } from "@/queue/jobHandlers/broadcast.handler";
 import { handleCleanupJob } from "@/queue/jobHandlers/cleanup.handler";
 import { handleNotificationJob } from "@/queue/jobHandlers/notification.handler";
@@ -19,6 +20,7 @@ export async function startWorkers() {
   getQueue(JobTypes.BROADCAST).process(handleBroadcastJob);
   getQueue(JobTypes.NOTIFICATION).process(handleNotificationJob);
   getQueue(JobTypes.CLEANUP_DATA).process(handleCleanupJob);
+  getQueue(JobTypes.AUDIENCE_SEGMENT).process(handleAudienceJob);
 
   workersRunning = true;
   logger.info("Bull workers initialized");

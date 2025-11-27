@@ -14,6 +14,7 @@ import { registerTelegramAuthRoutes } from "@/routes/telegramAuth";
 import { registerAuthRoutes } from "@/routes/auth";
 import { registerDashboardRoutes } from "@/routes/dashboard";
 import { registerParsingRoutes } from "@/routes/parsing";
+import { registerAudienceRoutes } from "@/routes/audience";
 
 function getRequestId(headers: Record<string, string | string[] | undefined>) {
   const headerValue = headers[config.server.requestIdHeader] ?? headers["x-request-id"];
@@ -53,6 +54,7 @@ export async function createServer(): Promise<FastifyInstance> {
   await app.register(registerAuthRoutes, { prefix: "/api/v1/auth" });
   await app.register(registerDashboardRoutes, { prefix: "/api/v1/dashboard" });
   await app.register(registerParsingRoutes, { prefix: "/api/v1/parsing" });
+  await app.register(registerAudienceRoutes, { prefix: "/api/v1/audience" });
 
   return app;
 }

@@ -12,6 +12,7 @@ const LIMIT_CATEGORY_ALIASES: Record<string, DashboardLimitCategory> = {
   parsing_channels: "parsing",
   audience_searches: "audience",
   audience_exports: "audience",
+  audience_segments: "audience",
   broadcast_messages: "broadcast",
   broadcast_campaigns: "broadcast",
 };
