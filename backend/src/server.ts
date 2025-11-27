@@ -13,6 +13,7 @@ import { registerHealthRoutes } from "@/routes/health";
 import { registerTelegramAuthRoutes } from "@/routes/telegramAuth";
 import { registerAuthRoutes } from "@/routes/auth";
 import { registerDashboardRoutes } from "@/routes/dashboard";
+import { registerParsingRoutes } from "@/routes/parsing";
 
 function getRequestId(headers: Record<string, string | string[] | undefined>) {
   const headerValue = headers[config.server.requestIdHeader] ?? headers["x-request-id"];
@@ -51,6 +52,7 @@ export async function createServer(): Promise<FastifyInstance> {
   await app.register(registerTelegramAuthRoutes, { prefix: "/api/v1/telegram/auth" });
   await app.register(registerAuthRoutes, { prefix: "/api/v1/auth" });
   await app.register(registerDashboardRoutes, { prefix: "/api/v1/dashboard" });
+  await app.register(registerParsingRoutes, { prefix: "/api/v1/parsing" });
 
   return app;
 }
