@@ -1,4 +1,4 @@
-import type { User } from "./user";
+import type { JwtPayload, User } from "./user";
 
 export interface RequestContext {
   startTime: bigint;
@@ -7,6 +7,8 @@ export interface RequestContext {
 declare module "fastify" {
   interface FastifyRequest {
     user?: User;
+    authPayload?: JwtPayload;
+    accessToken?: string;
     requestContext?: RequestContext;
   }
 }
