@@ -1,7 +1,10 @@
+import { NormalizedParsingFilters, SearchMode } from "@/types/parsing";
+
 export interface ParseSearchJob {
-  requestId: string;
+  requestId?: string;
+  searchId: string;
+  userId: string;
   query: string;
-  depth?: number;
-  initiatedBy?: string;
-  metadata?: Record<string, unknown>;
+  filters?: NormalizedParsingFilters;
+  mode: SearchMode;
 }
