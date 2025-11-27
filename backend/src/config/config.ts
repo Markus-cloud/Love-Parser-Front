@@ -42,6 +42,7 @@ export const config = {
   },
   security: {
     jwtSecret: rawEnv.JWT_SECRET,
+    sessionEncryptionKey: rawEnv.SESSION_ENCRYPTION_KEY,
   },
   database: {
     url: rawEnv.DATABASE_URL ?? rawEnv.POSTGRES_URL ?? DEFAULT_DATABASE_URL,

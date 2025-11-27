@@ -13,13 +13,14 @@
     "db:seed": "tsx src/scripts/seed.ts"
   },
   "dependencies": {
+    "@fastify/cors": "^10.0.2",
     "@fastify/helmet": "^13.0.2",
     "bull": "^4.13.1",
     "dotenv": "^16.4.7",
     "fastify": "^4.28.1",
-    "fastify-cors": "^8.5.0",
-    "fastify-jwt": "^6.0.1",
-    "gramjs": "^1.21.1",
+    "@fastify/jwt": "^9.1.0",
+    "telegram": "^2.26.22",
+    "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
     "pg": "^8.13.1",
     "redis": "^4.7.0",
@@ -27,6 +28,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.16.5",
     "@types/supertest": "^2.0.16",
     "supertest": "^6.3.4",

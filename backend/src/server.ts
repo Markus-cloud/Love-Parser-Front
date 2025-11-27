@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import Fastify, { FastifyInstance } from "fastify";
-import cors from "fastify-cors";
-import fastifyJwt from "fastify-jwt";
+import cors from "@fastify/cors";
+import fastifyJwt from "@fastify/jwt";
 import helmet from "@fastify/helmet";
 
 import { config } from "@/config/config";
@@ -10,6 +10,7 @@ import { errorHandler } from "@/middleware/errorHandler";
 import { rateLimitMiddleware } from "@/middleware/rateLimitMiddleware";
 import { registerRequestLogger } from "@/middleware/requestLogger";
 import { registerHealthRoutes } from "@/routes/health";
+import { registerTelegramAuthRoutes } from "@/routes/telegramAuth";
 
 function getRequestId(headers: Record<string, string | string[] | undefined>) {
   const headerValue = headers[config.server.requestIdHeader] ?? headers["x-request-id"];
@@ -45,6 +46,7 @@ export async function createServer(): Promise<FastifyInstance> {
   app.setErrorHandler(errorHandler);
 
   await app.register(registerHealthRoutes, { prefix: "/api" });
+  await app.register(registerTelegramAuthRoutes, { prefix: "/api/v1/telegram/auth" });
 
   return app;
 }

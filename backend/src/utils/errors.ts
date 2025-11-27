@@ -12,6 +12,15 @@ export const HTTP_STATUS = {
   SERVICE_UNAVAILABLE: 503,
 } as const;
 
+export type TelegramErrorCode =
+  | "INVALID_PHONE_NUMBER"
+  | "PHONE_MIGRATE"
+  | "PHONE_NUMBER_OCCUPIED"
+  | "SESSION_PASSWORD_NEEDED"
+  | "INVALID_CODE"
+  | "CODE_INVALID"
+  | "CODE_EXPIRED";
+
 export type ErrorCode =
   | "AUTH_ERROR"
   | "RATE_LIMIT_EXCEEDED"
@@ -20,7 +29,8 @@ export type ErrorCode =
   | "NOT_FOUND"
   | "FORBIDDEN"
   | "SERVICE_UNAVAILABLE"
-  | "INTERNAL_SERVER_ERROR";
+  | "INTERNAL_SERVER_ERROR"
+  | TelegramErrorCode;
 
 interface AppErrorOptions {
   statusCode?: number;
@@ -75,6 +85,12 @@ export class ForbiddenError extends AppError {
 export class NotFoundError extends AppError {
   constructor(message = "Resource not found", details?: unknown) {
     super(message, { statusCode: HTTP_STATUS.NOT_FOUND, code: "NOT_FOUND", details });
+  }
+}
+
+export class TelegramAuthError extends AppError {
+  constructor(code: TelegramErrorCode, message: string, statusCode: number, details?: unknown) {
+    super(message, { statusCode, code, details });
   }
 }
 

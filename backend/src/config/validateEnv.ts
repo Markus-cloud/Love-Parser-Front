@@ -10,6 +10,7 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url().optional(),
   CORS_ORIGIN: z.string().optional(),
   JWT_SECRET: z.string().min(10).default("changeme-secret"),
+  SESSION_ENCRYPTION_KEY: z.string().min(32).default("development-session-encryption-key-please-change"),
   DATABASE_URL: z.string().url().optional(),
   POSTGRES_URL: z.string().url().optional(),
   REDIS_URL: z.string().url().default("redis://localhost:6379"),

@@ -12,6 +12,9 @@ export interface User {
   id: string;
   email?: string;
   phoneNumber?: string;
+  telegramId?: string;
+  telegramUsername?: string;
+  fullName?: string;
   role?: string;
   status?: UserStatus;
   permissions?: string[];
@@ -25,6 +28,7 @@ export interface JwtPayload {
   permissions?: string[];
   profile?: UserProfile;
   sessionId?: string;
+  telegramId?: string;
   exp?: number;
   iat?: number;
 }
