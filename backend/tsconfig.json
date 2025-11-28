@@ -26,7 +26,8 @@
       "@/queue/*": ["queue/*"],
       "@/workers/*": ["workers/*"],
       "@/integrations/*": ["integrations/*"],
-      "@/monitoring/*": ["monitoring/*"]
+      "@/monitoring/*": ["monitoring/*"],
+      "@/__tests__/*": ["__tests__/*"]
     },
     "noUnusedLocals": false,
     "noUnusedParameters": false
