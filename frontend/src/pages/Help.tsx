@@ -1,7 +1,7 @@
 import { Layout } from "@/components/Layout";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Home, Search, Users, Send } from "lucide-react";
+import { BookOpen, Home, Search, Users, Send, Crown, ExternalLink } from "lucide-react";
 
 export default function Help() {
   const sections = [
@@ -68,6 +68,32 @@ export default function Help() {
             </div>
           );
         })}
+
+        <GlassCard className="bg-accent/5 border-accent/20">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-accent/30">
+                <Crown className="w-5 h-5 text-accent" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Оплата через Robokassa</h3>
+                <p className="text-sm text-muted-foreground">Перейдите на страницу Robokassa чтобы продлить подписку</p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button asChild className="flex-1">
+                <a href="https://auth.robokassa.ru/Merchant/Index.aspx" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2">
+                  <Crown className="w-4 h-4" /> Перейти в Robokassa
+                </a>
+              </Button>
+              <Button asChild variant="outline" className="flex-1">
+                <a href="https://www.robokassa.ru/ru/" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2">
+                  <ExternalLink className="w-4 h-4" /> Инструкция по оплате
+                </a>
+              </Button>
+            </div>
+          </div>
+        </GlassCard>
 
         <GlassCard className="bg-primary/5 border-primary/20">
           <h3 className="font-semibold mb-3">Важная информация</h3>

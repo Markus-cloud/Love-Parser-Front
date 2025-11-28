@@ -1,11 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
+import { fetchCurrentUser, logoutRequest, sendCode, verifyCode } from "@/api/auth.service";
+import { ApiError, getAccessToken, setAccessToken } from "@/api/client";
+import type { SendCodeResponse } from "@/api/auth.service";
 import type { AuthUser } from "@/types/auth";
-
-interface SendCodeResponse {
-  auth_session_id: string;
-  phone_code_hash: string;
-}
 
 interface VerifyPhoneCodePayload {
   authSessionId: string;
@@ -23,83 +21,34 @@ interface AuthContextValue {
   logout: () => Promise<void>;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-const TOKEN_STORAGE_KEY = "love_parser_access_token";
+export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-function safeGetToken() {
-  try {
-    return localStorage.getItem(TOKEN_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function safeStoreToken(token: string | null) {
-  try {
-    if (!token) {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-    } else {
-      localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    }
-  } catch {
-    // no-op
-  }
-}
-
-async function parseErrorMessage(response: Response) {
-  try {
-    const payload = await response.json();
-    if (payload?.error?.message) {
-      return payload.error.message as string;
-    }
-    if (payload?.message) {
-      return payload.message as string;
-    }
-  } catch {
-    // ignore JSON parse errors
-  }
-
-  return response.statusText || "Неизвестная ошибка";
-}
-
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const me = useCallback(async () => {
-    const token = safeGetToken();
+    const token = getAccessToken();
     if (!token) {
       setUser(null);
       return null;
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          safeStoreToken(null);
-          setUser(null);
-          return null;
-        }
-
-        throw new Error(await parseErrorMessage(response));
-      }
-
-      const data = (await response.json()) as AuthUser;
-      setUser(data);
-      return data;
+      const profile = await fetchCurrentUser();
+      setUser(profile);
+      return profile;
     } catch (error) {
       setUser(null);
+      if (error instanceof ApiError && error.status === 401) {
+        setAccessToken(null);
+        return null;
+      }
+
       if (error instanceof Error) {
         throw error;
       }
+
       throw new Error("Не удалось загрузить профиль");
     }
   }, []);
@@ -119,20 +68,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [me]);
 
   const requestPhoneCode = useCallback(async (rawPhoneNumber: string) => {
-    const phone_number = rawPhoneNumber.trim();
-    const response = await fetch(`${API_BASE_URL}/api/v1/telegram/auth/send-code`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ phone_number }),
-    });
-
-    if (!response.ok) {
-      throw new Error(await parseErrorMessage(response));
-    }
-
-    return (await response.json()) as SendCodeResponse;
+    const phoneNumber = rawPhoneNumber.trim();
+    return sendCode(phoneNumber);
   }, []);
 
   const verifyPhoneCode = useCallback(
@@ -143,21 +80,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         password,
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/telegram/auth/verify-code`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(await parseErrorMessage(response));
-      }
-
-      const data = (await response.json()) as { access_token?: string };
+      const data = await verifyCode(payload);
       if (data?.access_token) {
-        safeStoreToken(data.access_token);
+        setAccessToken(data.access_token);
       }
 
       return me();
@@ -166,19 +91,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const logout = useCallback(async () => {
-    const token = safeGetToken();
+    const token = getAccessToken();
 
     try {
       if (token) {
-        await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        await logoutRequest();
       }
     } finally {
-      safeStoreToken(null);
+      setAccessToken(null);
       setUser(null);
     }
   }, []);
@@ -198,12 +118,3 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-
-  return context;
-}
