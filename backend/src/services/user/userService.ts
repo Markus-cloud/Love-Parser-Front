@@ -37,7 +37,7 @@ interface UpdateTelegramProfileInput {
 }
 
 const FREE_PLAN_CODE = "free";
-const FREE_PLAN_NAME = "Free Plan";
+const FREE_PLAN_NAME = "Бесплатный";
 const DEFAULT_USAGE_LIMITS = [{ key: "searches_per_day", limit: 100 }];
 
 function mapUserRow(row: UserRow): User {
