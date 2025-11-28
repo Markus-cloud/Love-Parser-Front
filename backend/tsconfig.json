@@ -25,7 +25,8 @@
       "@/jobs/*": ["jobs/*"],
       "@/queue/*": ["queue/*"],
       "@/workers/*": ["workers/*"],
-      "@/integrations/*": ["integrations/*"]
+      "@/integrations/*": ["integrations/*"],
+      "@/monitoring/*": ["monitoring/*"]
     },
     "noUnusedLocals": false,
     "noUnusedParameters": false

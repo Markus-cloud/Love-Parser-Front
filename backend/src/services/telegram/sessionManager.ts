@@ -6,6 +6,7 @@ import { encryptSession, decryptSession } from "@/services/telegram/sessionEncry
 import { pgPool } from "@/utils/clients";
 import { AppError } from "@/utils/errors";
 import { logger } from "@/utils/logger";
+import { recordTelegramApiCall, recordTelegramApiError } from "@/monitoring/prometheus";
 
 const CONNECTION_RETRIES = 5;
 
@@ -61,19 +62,26 @@ export class TelegramSessionManager {
     const client = this.createClient();
     try {
       await client.connect();
-      const result = await client.invoke(
-        new Api.auth.SendCode({
-          phoneNumber,
-          apiId: this.apiId,
-          apiHash: this.apiHash,
-          settings: new Api.CodeSettings({
-            allowFlashcall: false,
-            allowAppHash: true,
-            currentNumber: true,
-            allowMissedCall: false,
+      recordTelegramApiCall("auth.sendCode");
+      let result: Api.auth.SentCode;
+      try {
+        result = await client.invoke(
+          new Api.auth.SendCode({
+            phoneNumber,
+            apiId: this.apiId,
+            apiHash: this.apiHash,
+            settings: new Api.CodeSettings({
+              allowFlashcall: false,
+              allowAppHash: true,
+              currentNumber: true,
+              allowMissedCall: false,
+            }),
           }),
-        }),
-      );
+        );
+      } catch (error) {
+        recordTelegramApiError("auth.sendCode");
+        throw error;
+      }
 
       const sessionString = client.session.save();
       return { phoneCodeHash: result.phoneCodeHash, sessionString };
@@ -89,13 +97,20 @@ export class TelegramSessionManager {
       await client.connect();
 
       try {
-        const authorization = await client.invoke(
-          new Api.auth.SignIn({
-            phoneNumber: state.phoneNumber,
-            phoneCodeHash: state.phoneCodeHash,
-            phoneCode: code,
-          }),
-        );
+        recordTelegramApiCall("auth.signIn");
+        let authorization: Api.auth.Authorization;
+        try {
+          authorization = await client.invoke(
+            new Api.auth.SignIn({
+              phoneNumber: state.phoneNumber,
+              phoneCodeHash: state.phoneCodeHash,
+              phoneCode: code,
+            }),
+          );
+        } catch (invokeError) {
+          recordTelegramApiError("auth.signIn");
+          throw invokeError;
+        }
 
         const sessionString = client.session.save();
         const telegramUser = this.extractAuthorizedUser(authorization);
@@ -121,9 +136,24 @@ export class TelegramSessionManager {
   }
 
   private async completePasswordSignIn(client: TelegramClient, password: string) {
-    const passwordInfo = await client.invoke(new Api.account.GetPassword());
+    recordTelegramApiCall("account.getPassword");
+    let passwordInfo: Api.account.Password;
+    try {
+      passwordInfo = await client.invoke(new Api.account.GetPassword());
+    } catch (error) {
+      recordTelegramApiError("account.getPassword");
+      throw error;
+    }
+
     const passwordSrp = await client.computePasswordSrp(passwordInfo, password);
-    return client.invoke(new Api.auth.CheckPassword({ password: passwordSrp }));
+
+    recordTelegramApiCall("auth.checkPassword");
+    try {
+      return await client.invoke(new Api.auth.CheckPassword({ password: passwordSrp }));
+    } catch (error) {
+      recordTelegramApiError("auth.checkPassword");
+      throw error;
+    }
   }
 
   private extractAuthorizedUser(authorization: { user?: Api.User }) {

@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 
-import { metricsRegistry } from "@/utils/metrics";
+import { metricsRegistry } from "@/monitoring/prometheus";
 
 export const registerMetricsRoutes: FastifyPluginAsync = async (app) => {
   app.get("/metrics", async (_, reply) => {

@@ -5,11 +5,13 @@ import { bootstrapQueues, shutdownQueues } from "@/services/queue.service";
 import { ensureTelegramClient } from "@/services/telegram.service";
 import { connectDatastores, disconnectDatastores } from "@/utils/clients";
 import { logger } from "@/utils/logger";
+import { startMonitoringCollectors, stopMonitoringCollectors } from "@/monitoring/prometheus";
 
 async function start() {
   try {
     await connectDatastores();
     await bootstrapQueues();
+    startMonitoringCollectors();
 
     if (config.telegram.apiId && config.telegram.apiHash) {
       await ensureTelegramClient();
