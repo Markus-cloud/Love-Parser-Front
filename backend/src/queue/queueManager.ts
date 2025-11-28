@@ -10,6 +10,7 @@ type QueueRegistry = {
   [JobTypes.NOTIFICATION]: Queue<JobPayloadMap[JobTypes.NOTIFICATION]>;
   [JobTypes.CLEANUP_DATA]: Queue<JobPayloadMap[JobTypes.CLEANUP_DATA]>;
   [JobTypes.AUDIENCE_SEGMENT]: Queue<JobPayloadMap[JobTypes.AUDIENCE_SEGMENT]>;
+  [JobTypes.CRON]: Queue<JobPayloadMap[JobTypes.CRON]>;
 };
 
 let queues: QueueRegistry | null = null;
@@ -64,6 +65,7 @@ export async function initializeQueues() {
     [JobTypes.NOTIFICATION]: createQueue<JobPayloadMap[JobTypes.NOTIFICATION]>("notifications", JobTypes.NOTIFICATION),
     [JobTypes.CLEANUP_DATA]: createQueue<JobPayloadMap[JobTypes.CLEANUP_DATA]>("cleanup", JobTypes.CLEANUP_DATA),
     [JobTypes.AUDIENCE_SEGMENT]: createQueue<JobPayloadMap[JobTypes.AUDIENCE_SEGMENT]>("audience", JobTypes.AUDIENCE_SEGMENT),
+    [JobTypes.CRON]: createQueue<JobPayloadMap[JobTypes.CRON]>("cron", JobTypes.CRON),
   } satisfies QueueRegistry;
 
   await Promise.all(Object.values(queues).map((queue) => queue.isReady()));
