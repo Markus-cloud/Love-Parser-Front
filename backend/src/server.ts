@@ -9,7 +9,8 @@ import { config } from "@/config/config";
 import { errorHandler } from "@/middleware/errorHandler";
 import { rateLimitMiddleware } from "@/middleware/rateLimitMiddleware";
 import { registerRequestLogger } from "@/middleware/requestLogger";
-import { registerHealthRoutes } from "@/routes/health";
+import { registerPrometheusMiddleware } from "@/monitoring/prometheus";
+import { registerHealthCheckRoutes } from "@/monitoring/healthCheck";
 import { registerTelegramAuthRoutes } from "@/routes/telegramAuth";
 import { registerAuthRoutes } from "@/routes/auth";
 import { registerDashboardRoutes } from "@/routes/dashboard";
@@ -48,11 +49,13 @@ export async function createServer(): Promise<FastifyInstance> {
   await app.register(fastifyJwt, { secret: config.security.jwtSecret });
 
   registerRequestLogger(app);
+  registerPrometheusMiddleware(app);
   app.addHook("preHandler", rateLimitMiddleware);
   app.setErrorHandler(errorHandler);
 
   await app.register(registerMetricsRoutes);
-  await app.register(registerHealthRoutes, { prefix: "/api" });
+  await app.register(registerHealthCheckRoutes);
+  await app.register(registerHealthCheckRoutes, { prefix: "/api" });
   await app.register(registerTelegramAuthRoutes, { prefix: "/api/v1/telegram/auth" });
   await app.register(registerAuthRoutes, { prefix: "/api/v1/auth" });
   await app.register(registerDashboardRoutes, { prefix: "/api/v1/dashboard" });

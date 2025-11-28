@@ -6,6 +6,7 @@ import { config } from "@/config/config";
 import { ensureTelegramClient } from "@/services/telegram.service";
 import { NormalizedParsingFilters, ParsedChannel, SearchMode } from "@/types/parsing";
 import { logger } from "@/utils/logger";
+import { recordTelegramApiCall, recordTelegramApiError } from "@/monitoring/prometheus";
 
 const SUPPORTED_LANGUAGES = ["en", "ru", "es", "de", "fr", "pt", "tr", "vi", "id", "ar"] as const;
 
@@ -142,12 +143,19 @@ async function performLiveChannelSearch(
   limit: number,
 ): Promise<ParsedChannel[]> {
   const client = await ensureTelegramClient();
-  const response = await client.invoke(
-    new Api.contacts.Search({
-      q: query,
-      limit,
-    }),
-  );
+  recordTelegramApiCall("contacts.search");
+  let response: Api.contacts.Found;
+  try {
+    response = await client.invoke(
+      new Api.contacts.Search({
+        q: query,
+        limit,
+      }),
+    );
+  } catch (error) {
+    recordTelegramApiError("contacts.search");
+    throw error;
+  }
 
   const chats = Array.isArray(response.chats) ? response.chats : [];
   const channels: ParsedChannel[] = [];
@@ -163,14 +171,21 @@ async function performLiveChannelSearch(
 
     if (chat.accessHash) {
       try {
-        const fullChannel = await client.invoke(
-          new Api.channels.GetFullChannel({
-            channel: new Api.InputChannel({
-              channelId: chat.id,
-              accessHash: chat.accessHash,
+        recordTelegramApiCall("channels.getFullChannel");
+        let fullChannel: Api.messages.ChatFull;
+        try {
+          fullChannel = await client.invoke(
+            new Api.channels.GetFullChannel({
+              channel: new Api.InputChannel({
+                channelId: chat.id,
+                accessHash: chat.accessHash,
+              }),
             }),
-          }),
-        );
+          );
+        } catch (error) {
+          recordTelegramApiError("channels.getFullChannel");
+          throw error;
+        }
 
         if (fullChannel.fullChat instanceof Api.ChannelFull) {
           memberCount = Number(fullChannel.fullChat.participantsCount ?? memberCount);

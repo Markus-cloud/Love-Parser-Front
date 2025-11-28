@@ -2,6 +2,8 @@ import type { JwtPayload, User } from "./user";
 
 export interface RequestContext {
   startTime: bigint;
+  metricsStartTime?: bigint;
+  hadError?: boolean;
 }
 
 declare module "fastify" {

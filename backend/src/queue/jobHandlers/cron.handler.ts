@@ -2,7 +2,7 @@ import { Job } from "bull";
 
 import { getCronJobByKey } from "@/jobs/cron";
 import { CronJobPayload } from "@/jobs/cron/types";
-import { cronJobDurationHistogram, cronJobResultCounter } from "@/utils/metrics";
+import { cronJobDurationHistogram, cronJobResultCounter } from "@/monitoring/prometheus";
 import { logger } from "@/utils/logger";
 
 export async function handleCronJob(job: Job<CronJobPayload>) {

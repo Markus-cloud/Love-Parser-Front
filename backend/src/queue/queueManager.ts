@@ -2,6 +2,7 @@ import Queue, { QueueOptions } from "bull";
 
 import { config } from "@/config/config";
 import { JobPayloadMap, JobTypes } from "@/jobs/jobTypes";
+import { logErrorEvent } from "@/monitoring/errorLogService";
 import { logger } from "@/utils/logger";
 
 type QueueRegistry = {
@@ -40,7 +41,15 @@ function attachEventListeners<T>(queue: Queue<T>, jobType: JobTypes) {
   });
 
   queue.on("failed", (job, error) => {
-    logger.error(`Job failed`, { jobType, jobId: job?.id, error });
+    void logErrorEvent(error, {
+      message: "Job failed",
+      service: "queue",
+      context: {
+        job_id: job?.id,
+        job_type: jobType,
+        attempts: job?.attemptsMade,
+      },
+    });
   });
 }
 
@@ -79,6 +88,10 @@ export function getQueue<T extends JobTypes>(jobType: T): Queue<JobPayloadMap[T]
   }
 
   return queues[jobType] as Queue<JobPayloadMap[T]>;
+}
+
+export function getRegisteredQueues() {
+  return queues;
 }
 
 export async function closeQueues() {

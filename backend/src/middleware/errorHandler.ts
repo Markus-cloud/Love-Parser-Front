@@ -1,27 +1,27 @@
 import { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 
+import { logErrorEvent } from "@/monitoring/errorLogService";
 import { formatError } from "@/utils/errors";
-import { logger } from "@/utils/logger";
 
-export function errorHandler(error: FastifyError | Error, request: FastifyRequest, reply: FastifyReply) {
+export async function errorHandler(error: FastifyError | Error, request: FastifyRequest, reply: FastifyReply) {
   const formatted = formatError(error, request.id);
   const statusCode = formatted.error.statusCode;
+  const severity = statusCode >= 500 ? "error" : "warn";
 
-  if (statusCode >= 500) {
-    logger.error("Unhandled server error", {
-      error,
-      requestId: request.id,
+  await logErrorEvent(error, {
+    severity,
+    message: severity === "error" ? "Unhandled server error" : "Request failed",
+    service: "api",
+    requestId: request.id,
+    userId: request.user?.id,
+    errorCode: formatted.error.code,
+    context: {
       method: request.method,
-      url: request.url,
-    });
-  } else {
-    logger.warn("Request failed", {
-      error: formatted.error,
-      requestId: request.id,
-      method: request.method,
-      url: request.url,
-    });
-  }
+      path: request.url,
+      status_code: statusCode,
+      details: formatted.error.details,
+    },
+  });
 
   if (!reply.sent) {
     reply.status(statusCode).send(formatted);

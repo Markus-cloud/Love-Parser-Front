@@ -18,7 +18,9 @@ export function registerRequestLogger(app: FastifyInstance) {
     reply.header(config.server.requestIdHeader, request.id);
 
     logger.info("Incoming request", {
+      service: "api",
       requestId: request.id,
+      request_id: request.id,
       method: request.method,
       url: request.url,
       ip: request.ip,
@@ -31,12 +33,14 @@ export function registerRequestLogger(app: FastifyInstance) {
     const durationMs = getDurationMs(request.requestContext?.startTime) ?? 0;
 
     logger.info("Request completed", {
+      service: "api",
       requestId: request.id,
+      request_id: request.id,
+      user_id: request.user?.id,
       method: request.method,
       url: request.url,
       statusCode: reply.statusCode,
       durationMs,
-      userId: request.user?.id,
     });
 
     done();
