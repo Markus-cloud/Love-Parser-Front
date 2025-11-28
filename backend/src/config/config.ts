@@ -2,6 +2,7 @@ import { validateEnv } from "@/config/validateEnv";
 
 const DEFAULT_DATABASE_URL = "postgresql://love_parser:love_parser@localhost:5432/love_parser";
 const DEFAULT_FRONTEND_URL = "http://localhost:5173";
+const DEFAULT_ROBOKASSA_URL = "https://auth.robokassa.ru/Merchant/Index.aspx";
 
 const rawEnv = validateEnv();
 
@@ -59,6 +60,13 @@ export const config = {
     apiId: rawEnv.TELEGRAM_API_ID ?? 0,
     apiHash: rawEnv.TELEGRAM_API_HASH ?? "",
     session: rawEnv.TELEGRAM_SESSION ?? "",
+  },
+  robokassa: {
+    merchantLogin: rawEnv.ROBOKASSA_MERCHANT_LOGIN,
+    password1: rawEnv.ROBOKASSA_PASSWORD1,
+    password2: rawEnv.ROBOKASSA_PASSWORD2,
+    isTest: rawEnv.ROBOKASSA_IS_TEST,
+    paymentUrl: rawEnv.ROBOKASSA_PAYMENT_URL ?? DEFAULT_ROBOKASSA_URL,
   },
 } as const;
 
