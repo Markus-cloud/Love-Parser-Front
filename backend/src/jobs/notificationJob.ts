@@ -1,10 +1,12 @@
-export type NotificationChannel = "email" | "sms" | "push";
+export type NotificationChannel = "telegram" | "email" | "in_app";
+
+export type NotificationTemplate = "DATA_REMOVAL" | "SUBSCRIPTION_EXPIRING" | "PAYMENT_PENDING_REMINDER";
 
 export interface NotificationJob {
   notificationId: string;
-  recipientId: string;
+  userId: string;
   channel: NotificationChannel;
-  template: string;
-  payload: Record<string, unknown>;
-  delayMs?: number;
+  template: NotificationTemplate;
+  message: string;
+  metadata?: Record<string, unknown>;
 }
