@@ -1,0 +1,82 @@
+{
+  "id": null,
+  "uid": "redis-health",
+  "title": "Redis Health",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Command latency (avg 5m)",
+      "datasource": { "type": "prometheus", "uid": "love-prom" },
+      "targets": [
+        {
+          "expr": "sum(rate(redis_command_call_duration_seconds_sum[5m])) / sum(rate(redis_command_call_duration_seconds_count[5m]))",
+          "legendFormat": "avg latency",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Memory usage",
+      "datasource": { "type": "prometheus", "uid": "love-prom" },
+      "targets": [
+        { "expr": "redis_memory_used_bytes", "legendFormat": "used", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Key count",
+      "datasource": { "type": "prometheus", "uid": "love-prom" },
+      "targets": [
+        { "expr": "redis_db_keys{db=\"db0\"}", "legendFormat": "db0", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Evictions per second",
+      "datasource": { "type": "prometheus", "uid": "love-prom" },
+      "targets": [
+        { "expr": "rate(redis_evicted_keys_total[5m])", "legendFormat": "evictions", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Connected clients",
+      "datasource": { "type": "prometheus", "uid": "love-prom" },
+      "targets": [
+        { "expr": "redis_connected_clients", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 100 } ] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 16 }
+    }
+  ]
+}

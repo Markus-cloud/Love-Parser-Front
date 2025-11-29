@@ -1,0 +1,36 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker-logs
+    pipeline_stages:
+      - docker: {}
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: docker
+          __path__: /var/lib/docker/containers/*/*-json.log
+
+  - job_name: backend-winston
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: backend-winston
+          app: love-parser-backend
+          environment: production
+          __path__: /var/log/love-parser/*.log
+
+  - job_name: postgres-logs
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: postgres-logs
+          app: postgres
+          __path__: /var/log/postgresql/*.log

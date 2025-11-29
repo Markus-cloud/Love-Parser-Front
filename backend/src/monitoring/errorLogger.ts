@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import * as Sentry from "@sentry/node";
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 
@@ -37,6 +38,16 @@ const transports: winston.transport[] = [
   }),
 ];
 
+const sentryEnabled = Boolean(config.monitoring?.sentryDsn);
+
+if (sentryEnabled) {
+  Sentry.init({
+    dsn: config.monitoring?.sentryDsn ?? undefined,
+    environment: config.nodeEnv,
+    tracesSampleRate: config.nodeEnv === "production" ? 0.1 : 1,
+  });
+}
+
 if (config.nodeEnv !== "production") {
   transports.push(
     new winston.transports.Console({
@@ -59,3 +70,31 @@ export const logger = winston.createLogger({
   format: jsonFormat,
   transports,
 });
+
+export function captureWithSentry(error: Error, context?: Record<string, unknown>) {
+  if (!sentryEnabled) {
+    return;
+  }
+
+  Sentry.withScope((scope) => {
+    if (context) {
+      Object.entries(context).forEach(([key, value]) => {
+        if (value === undefined) {
+          return;
+        }
+
+        if (value !== null && typeof value === "object") {
+          scope.setContext(key, value as Record<string, unknown>);
+        } else {
+          scope.setExtra(key, value as string | number | boolean | null);
+        }
+      });
+
+      if (typeof context.service === "string") {
+        scope.setTag("service", context.service);
+      }
+    }
+
+    Sentry.captureException(error);
+  });
+}

@@ -1,4 +1,4 @@
-import { logger } from "@/monitoring/errorLogger";
+import { captureWithSentry, logger } from "@/monitoring/errorLogger";
 import { pgPool } from "@/utils/clients";
 
 export type LogSeverity = "error" | "warn" | "info" | "debug";
@@ -62,6 +62,10 @@ export async function logErrorEvent(error: unknown, options?: LogErrorEventOptio
     error: normalizedError,
     ...context,
   });
+
+  if (severity === "error") {
+    captureWithSentry(normalizedError, context);
+  }
 
   if (severity === "error" || severity === "warn") {
     await persistErrorLog({

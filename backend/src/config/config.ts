@@ -68,6 +68,9 @@ export const config = {
     isTest: rawEnv.ROBOKASSA_IS_TEST,
     paymentUrl: rawEnv.ROBOKASSA_PAYMENT_URL ?? DEFAULT_ROBOKASSA_URL,
   },
+  monitoring: {
+    sentryDsn: rawEnv.SENTRY_DSN ?? null,
+  },
 } as const;
 
 export type AppConfig = typeof config;

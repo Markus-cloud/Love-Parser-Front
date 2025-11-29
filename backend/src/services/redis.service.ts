@@ -5,6 +5,7 @@ import { logger } from "@/utils/logger";
 
 const MIN_POOL_SIZE = 1;
 const MAX_POOL_SIZE = 5;
+export const REDIS_POOL_MAX_CONNECTIONS = MAX_POOL_SIZE;
 const ACQUIRE_TIMEOUT_MS = 5_000;
 
 type ManagedRedisClient = RedisClientType;

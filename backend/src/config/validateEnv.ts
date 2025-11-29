@@ -25,6 +25,7 @@ const envSchema = z.object({
   ROBOKASSA_PASSWORD2: z.string().default("demoPassword2"),
   ROBOKASSA_IS_TEST: z.coerce.boolean().default(true),
   ROBOKASSA_PAYMENT_URL: z.string().url().optional(),
+  SENTRY_DSN: z.string().url().optional(),
 });
 
 export type EnvSchema = z.infer<typeof envSchema>;
