@@ -4,8 +4,54 @@ import { pgPool } from "@/utils/clients";
 import { NotFoundError, RateLimitError, ValidationError } from "@/utils/errors";
 import { logger } from "@/utils/logger";
 import { invalidateDashboardCache } from "@/services/dashboard/dashboard.service";
+import { withRedisClient } from "@/services/redis.service";
 
 const AUDIENCE_LIMIT_KEYS = ["audience_segments", "audience_searches", "audience_exports"] as const;
+
+const SEGMENT_CACHE_PREFIX = "audience:segment";
+const SEGMENT_CACHE_TTL_SECONDS = 60 * 10;
+
+function buildSegmentCacheKey(userId: string, segmentId: string) {
+  return `${SEGMENT_CACHE_PREFIX}:${userId}:${segmentId}`;
+}
+
+async function readSegmentCache(userId: string, segmentId: string): Promise<AudienceSegment | undefined> {
+  const cacheKey = buildSegmentCacheKey(userId, segmentId);
+  try {
+    const raw = await withRedisClient((client) => client.get(cacheKey));
+    if (!raw) {
+      return undefined;
+    }
+
+    return JSON.parse(raw) as AudienceSegment;
+  } catch (error) {
+    logger.warn("Failed to read audience segment cache", { userId, segmentId, error });
+    try {
+      await withRedisClient((client) => client.del(cacheKey));
+    } catch (cleanupError) {
+      logger.warn("Failed to reset audience segment cache key", { userId, segmentId, cleanupError });
+    }
+    return undefined;
+  }
+}
+
+async function writeSegmentCache(segment: AudienceSegment) {
+  const cacheKey = buildSegmentCacheKey(segment.userId, segment.id);
+  try {
+    await withRedisClient((client) => client.setEx(cacheKey, SEGMENT_CACHE_TTL_SECONDS, JSON.stringify(segment)));
+  } catch (error) {
+    logger.warn("Failed to write audience segment cache", { userId: segment.userId, segmentId: segment.id, error });
+  }
+}
+
+export async function invalidateSegmentCache(userId: string, segmentId: string) {
+  const cacheKey = buildSegmentCacheKey(userId, segmentId);
+  try {
+    await withRedisClient((client) => client.del(cacheKey));
+  } catch (error) {
+    logger.warn("Failed to invalidate audience segment cache", { userId, segmentId, error });
+  }
+}
 
 interface AudienceSegmentRow {
   id: string;
@@ -407,10 +453,12 @@ export async function createSegment({ userId, name, description, sourceParsingId
       [userId, trimmedName, description ?? null, serializeFilters(filters), sourceParsingId, totalRecipients],
     );
 
+    const segment = mapSegmentRow(result.rows[0]);
     await incrementAudienceUsage(userId, 1);
     await invalidateDashboardCache(userId);
+    await writeSegmentCache(segment);
 
-    return mapSegmentRow(result.rows[0]);
+    return segment;
   } catch (error) {
     if ((error as { code?: string }).code === "23505") {
       throw new ValidationError("Segment name already exists");
@@ -438,6 +486,11 @@ export async function listSegments(userId: string, page: number, limit: number):
 }
 
 export async function getSegment(userId: string, segmentId: string): Promise<AudienceSegment> {
+  const cached = await readSegmentCache(userId, segmentId);
+  if (cached) {
+    return cached;
+  }
+
   const result = await pgPool.query<AudienceSegmentRow>(
     `SELECT id, user_id, name, description, filters, source_parsing_id, total_recipients, status, created_at, updated_at
      FROM audience_segments
@@ -450,7 +503,9 @@ export async function getSegment(userId: string, segmentId: string): Promise<Aud
     throw new NotFoundError("Audience segment not found");
   }
 
-  return mapSegmentRow(result.rows[0]);
+  const segment = mapSegmentRow(result.rows[0]);
+  await writeSegmentCache(segment);
+  return segment;
 }
 
 export async function updateSegment({ userId, segmentId, filters }: UpdateSegmentInput): Promise<AudienceSegment> {
@@ -481,9 +536,11 @@ export async function updateSegment({ userId, segmentId, filters }: UpdateSegmen
     throw new NotFoundError("Audience segment not found");
   }
 
+  const segment = mapSegmentRow(result.rows[0]);
   await invalidateDashboardCache(userId);
+  await writeSegmentCache(segment);
 
-  return mapSegmentRow(result.rows[0]);
+  return segment;
 }
 
 export async function deleteSegment(userId: string, segmentId: string): Promise<void> {
@@ -499,6 +556,7 @@ export async function deleteSegment(userId: string, segmentId: string): Promise<
 
   await decrementAudienceUsage(userId, 1);
   await invalidateDashboardCache(userId);
+  await invalidateSegmentCache(userId, segmentId);
 }
 
 export async function getSegmentPreview(userId: string, segmentId: string, limit: number): Promise<SegmentPreviewResult> {

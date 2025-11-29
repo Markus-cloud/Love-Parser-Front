@@ -2,6 +2,7 @@ import { pgPool } from "@/utils/clients";
 import { NotFoundError, ValidationError } from "@/utils/errors";
 import { User, UserProfile, UserStatus } from "@/types/user";
 import { invalidateDashboardCache } from "@/services/dashboard/dashboard.service";
+import { invalidateSubscriptionCache } from "@/services/subscription/subscriptionService";
 
 interface UserRow {
   id: string;
@@ -215,6 +216,7 @@ export async function ensureFreeSubscription(userId: string) {
   );
 
   await invalidateDashboardCache(userId);
+  await invalidateSubscriptionCache(userId);
 }
 
 export async function ensureDefaultUsageLimits(userId: string) {

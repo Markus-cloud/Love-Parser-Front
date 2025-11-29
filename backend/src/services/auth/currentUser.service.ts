@@ -1,13 +1,7 @@
+import { checkSubscriptionExpired, getSubscriptionByUserId } from "@/services/subscription/subscriptionService";
 import { AuthUserResponse, SubscriptionSummary } from "@/types/auth";
 import { User, UserProfile } from "@/types/user";
 import { pgPool } from "@/utils/clients";
-
-interface SubscriptionRow {
-  plan_code: string | null;
-  plan_name: string | null;
-  status: string | null;
-  expires_at: Date | null;
-}
 
 interface UsageLimitRow {
   limit_key: string;
@@ -108,25 +102,16 @@ function resolveTelegramPhotoId(profile?: TelegramProfile) {
 }
 
 export async function enrichUserWithSubscription(user: AuthUserResponse): Promise<AuthUserResponse> {
-  const result = await pgPool.query<SubscriptionRow>(
-    `SELECT plan_code, plan_name, status, expires_at
-     FROM subscriptions
-     WHERE user_id = $1 AND status IN ('active', 'trialing')
-     ORDER BY expires_at DESC
-     LIMIT 1`,
-    [user.id],
-  );
-
-  if (result.rowCount === 0) {
+  const subscription = await getSubscriptionByUserId(user.id);
+  if (!subscription || checkSubscriptionExpired(subscription)) {
     user.subscription = null;
     return user;
   }
 
-  const row = result.rows[0];
   const summary: SubscriptionSummary = {
-    plan_type: row.plan_code ?? row.plan_name ?? null,
-    status: row.status ?? null,
-    expires_at: row.expires_at ? row.expires_at.toISOString() : null,
+    plan_type: subscription.planCode ?? subscription.planName ?? null,
+    status: subscription.status ?? null,
+    expires_at: subscription.expiresAt ? subscription.expiresAt.toISOString() : null,
   };
 
   user.subscription = summary;

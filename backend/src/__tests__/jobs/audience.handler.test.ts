@@ -5,12 +5,14 @@ import { handleAudienceJob } from "@/queue/jobHandlers/audience.handler";
 
 const mockGetSegment = vi.fn();
 const mockCalculateTotalRecipients = vi.fn();
+const mockInvalidateSegmentCache = vi.fn();
 const mockInvalidateDashboardCache = vi.fn();
 const queryMock = vi.fn();
 
 vi.mock("@/services/audience/audienceService", () => ({
   getSegment: mockGetSegment,
   calculateTotalRecipients: mockCalculateTotalRecipients,
+  invalidateSegmentCache: mockInvalidateSegmentCache,
 }));
 
 vi.mock("@/services/dashboard/dashboard.service", () => ({
@@ -27,6 +29,7 @@ describe("audience job handler", () => {
   beforeEach(() => {
     mockGetSegment.mockReset();
     mockCalculateTotalRecipients.mockReset();
+    mockInvalidateSegmentCache.mockReset();
     mockInvalidateDashboardCache.mockReset();
     queryMock.mockReset();
   });
@@ -41,6 +44,7 @@ describe("audience job handler", () => {
     expect(result).toMatchObject({ totalRecipients: 42 });
     expect(queryMock).toHaveBeenCalledWith(expect.stringContaining("update audience_segments"), ["segment-1", "user-1", 42, "ready"]);
     expect(mockInvalidateDashboardCache).toHaveBeenCalledWith("user-1");
+    expect(mockInvalidateSegmentCache).toHaveBeenCalledWith("user-1", "segment-1");
   });
 
   it("marks segment as failed when parsing source is missing", async () => {
@@ -51,6 +55,7 @@ describe("audience job handler", () => {
 
     expect(result.totalRecipients).toBe(0);
     expect(mockCalculateTotalRecipients).not.toHaveBeenCalled();
+    expect(mockInvalidateSegmentCache).toHaveBeenCalledWith("user-1", "segment-1");
   });
 });
 

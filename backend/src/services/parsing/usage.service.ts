@@ -1,3 +1,4 @@
+import { getSubscriptionByUserId, checkSubscriptionExpired } from "@/services/subscription/subscriptionService";
 import { pgPool } from "@/utils/clients";
 import { RateLimitError, SubscriptionError } from "@/utils/errors";
 
@@ -10,10 +11,6 @@ type UsageLimitRow = {
   consumed_value: number | null;
 };
 
-type SubscriptionRow = {
-  status: string | null;
-  expires_at: Date | null;
-};
 
 async function findParsingLimitRow(userId: string): Promise<UsageLimitRow | null> {
   const result = await pgPool.query<UsageLimitRow>(
@@ -33,22 +30,12 @@ async function findParsingLimitRow(userId: string): Promise<UsageLimitRow | null
 }
 
 export async function assertActiveSubscription(userId: string) {
-  const result = await pgPool.query<SubscriptionRow>(
-    `SELECT status, expires_at
-     FROM subscriptions
-     WHERE user_id = $1 AND status IN ('active', 'trialing')
-     ORDER BY expires_at DESC
-     LIMIT 1`,
-    [userId],
-  );
-
-  if (result.rowCount === 0) {
+  const subscription = await getSubscriptionByUserId(userId);
+  if (!subscription) {
     throw new SubscriptionError("Active subscription required");
   }
 
-  const row = result.rows[0];
-  const expiresAt = row.expires_at ? row.expires_at.getTime() : 0;
-  if (!expiresAt || expiresAt <= Date.now()) {
+  if (checkSubscriptionExpired(subscription)) {
     throw new SubscriptionError("Subscription expired");
   }
 }
