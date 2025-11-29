@@ -1,0 +1,123 @@
+name: Reusable Quality Gate
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://love_parser:love_parser@127.0.0.1:5432/test-loveparser
+      REDIS_URL: redis://127.0.0.1:6379/0
+      CI: true
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: love_parser
+          POSTGRES_PASSWORD: love_parser
+          POSTGRES_DB: test-loveparser
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U love_parser"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Wait for database
+        run: pnpm --filter @love-parser/backend db:wait
+
+      - name: Verify Redis connection
+        run: pnpm --filter @love-parser/backend redis:healthcheck
+
+      - name: Lint frontend
+        run: pnpm lint
+
+      - name: Lint backend
+        run: pnpm --filter @love-parser/backend lint
+
+      - name: Type check frontend
+        run: pnpm --filter @love-parser/frontend tsc --noEmit
+
+      - name: Type check backend
+        run: pnpm --filter @love-parser/backend typecheck
+
+      - name: Unit tests
+        run: pnpm --filter @love-parser/backend test:unit
+
+      - name: Integration tests
+        run: pnpm --filter @love-parser/backend test:integration
+
+      - name: Coverage (Vitest)
+        run: pnpm --filter @love-parser/backend test:coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage
+
+      - name: Database migrations (apply & rollback)
+        run: |
+          pnpm --filter @love-parser/backend db:migrate
+          pnpm --filter @love-parser/backend db:rollback
+
+      - name: Build frontend
+        run: pnpm build:frontend
+
+      - name: Build backend
+        run: pnpm --filter @love-parser/backend build
+
+      - name: npm audit (backend)
+        working-directory: backend
+        run: npm audit --audit-level=high --omit=dev
+
+      - name: Prepare reports directory
+        run: mkdir -p reports
+
+      - name: Dependency-Check scan
+        uses: dependency-check/Dependency-Check_Action@v3.1.2
+        with:
+          project: love-parser
+          path: ./backend
+          format: HTML
+          out: ./reports/owasp
+
+      - name: Upload OWASP report
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-report
+          path: reports/owasp

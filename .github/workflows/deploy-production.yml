@@ -1,0 +1,156 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'release-*'
+
+permissions:
+  contents: read
+  packages: write
+  deployments: write
+
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+
+  build-images:
+    needs: quality
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ghcr.io
+    outputs:
+      backend-image: ${{ steps.meta.outputs.backend-image }}
+      frontend-image: ${{ steps.meta.outputs.frontend-image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute metadata
+        id: meta
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          backend_image="$REGISTRY/$repo/backend:${GITHUB_SHA}"
+          frontend_image="$REGISTRY/$repo/frontend:${GITHUB_SHA}"
+          echo "backend-image=$backend_image" >> "$GITHUB_OUTPUT"
+          echo "frontend-image=$frontend_image" >> "$GITHUB_OUTPUT"
+          echo "backend-tags=$backend_image,$REGISTRY/$repo/backend:production,$REGISTRY/$repo/backend:latest" >> "$GITHUB_OUTPUT"
+          echo "frontend-tags=$frontend_image,$REGISTRY/$repo/frontend:production,$REGISTRY/$repo/frontend:latest" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.backend-tags }}
+          cache-to: type=inline
+
+      - name: Build & push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.frontend-tags }}
+          cache-to: type=inline
+
+  deploy:
+    needs: build-images
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://loveparser.ru
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write SSH key
+        run: |
+          echo "${{ secrets.PRODUCTION_SSH_KEY }}" > production.key
+          chmod 600 production.key
+
+      - name: Deploy via blue/green
+        id: deploy-step
+        env:
+          DEPLOY_MIGRATION_COMMAND: npm run db:migrate
+          DEPLOY_ROLLBACK_COMMAND: npm run db:rollback
+        run: |
+          ./deployment/scripts/deploy-blue-green.sh \
+            --environment production \
+            --host "${{ secrets.PRODUCTION_SSH_HOST }}" \
+            --user "${{ secrets.PRODUCTION_SSH_USER }}" \
+            --key production.key \
+            --deploy-path "${{ secrets.PRODUCTION_DEPLOY_PATH }}" \
+            --backend-image "${{ needs.build-images.outputs.backend-image }}" \
+            --frontend-image "${{ needs.build-images.outputs.frontend-image }}" \
+            --healthcheck-url "${{ secrets.PRODUCTION_HEALTHCHECK_URL }}"
+
+      - name: Rollback failed deployment
+        if: failure()
+        run: |
+          ./deployment/scripts/rollback.sh \
+            --host "${{ secrets.PRODUCTION_SSH_HOST }}" \
+            --user "${{ secrets.PRODUCTION_SSH_USER }}" \
+            --key production.key \
+            --deploy-path "${{ secrets.PRODUCTION_DEPLOY_PATH }}"
+
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Smoke tests
+        run: |
+          ./deployment/scripts/smoke-test.sh \
+            --base-url "${{ secrets.PRODUCTION_SMOKE_TEST_URL }}" \
+            --smoke-path /api/v1/health
+
+  notify:
+    needs: [deploy, smoke]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Slack notification
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "Production deploy *${{ github.sha }}* finished with deploy=${{ needs.deploy.result }} smoke=${{ needs.smoke.result }}. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Email notification
+        if: ${{ secrets.PRODUCTION_EMAIL_HOST != '' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.PRODUCTION_EMAIL_HOST }}
+          server_port: ${{ secrets.PRODUCTION_EMAIL_PORT }}
+          username: ${{ secrets.PRODUCTION_EMAIL_USERNAME }}
+          password: ${{ secrets.PRODUCTION_EMAIL_PASSWORD }}
+          subject: "Production deploy ${{ github.sha }} - deploy=${{ needs.deploy.result }} smoke=${{ needs.smoke.result }}"
+          to: ${{ secrets.PRODUCTION_EMAIL_TO }}
+          from: Love Parser CI <${{ secrets.PRODUCTION_EMAIL_USERNAME }}>
+          body: |
+            Production deployment summary:
+            - Commit: ${{ github.sha }}
+            - Deploy job: ${{ needs.deploy.result }}
+            - Smoke tests: ${{ needs.smoke.result }}
+            - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -13,11 +13,20 @@ dist
 dist-ssr
 pnpm-lock.yaml
 frontend/.env
+frontend/.env.staging
+frontend/.env.production
 backend/.env
+backend/.env.staging
+backend/.env.production
 *.local
+coverage
+backend/coverage
+frontend/coverage
+reports
+*.key
 
 # Editor directories and files
-.vscode/*
+
 !.vscode/extensions.json
 .idea
 .DS_Store

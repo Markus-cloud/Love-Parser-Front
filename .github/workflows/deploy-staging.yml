@@ -1,0 +1,123 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+  packages: write
+  deployments: write
+
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+
+  build-images:
+    needs: quality
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ghcr.io
+    outputs:
+      backend-image: ${{ steps.meta.outputs.backend-image }}
+      frontend-image: ${{ steps.meta.outputs.frontend-image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute metadata
+        id: meta
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          backend_image="$REGISTRY/$repo/backend:${GITHUB_SHA}"
+          frontend_image="$REGISTRY/$repo/frontend:${GITHUB_SHA}"
+          echo "backend-image=$backend_image" >> "$GITHUB_OUTPUT"
+          echo "frontend-image=$frontend_image" >> "$GITHUB_OUTPUT"
+          echo "backend-tags=$backend_image,$REGISTRY/$repo/backend:staging" >> "$GITHUB_OUTPUT"
+          echo "frontend-tags=$frontend_image,$REGISTRY/$repo/frontend:staging" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.backend-tags }}
+          cache-to: type=inline
+
+      - name: Build & push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.frontend-tags }}
+          cache-to: type=inline
+
+  deploy:
+    needs: build-images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write SSH key
+        run: |
+          echo "${{ secrets.STAGING_SSH_KEY }}" > staging.key
+          chmod 600 staging.key
+
+      - name: Deploy via blue/green
+        env:
+          DEPLOY_MIGRATION_COMMAND: npm run db:migrate
+          DEPLOY_ROLLBACK_COMMAND: npm run db:rollback
+        run: |
+          ./deployment/scripts/deploy-blue-green.sh \
+            --environment staging \
+            --host "${{ secrets.STAGING_SSH_HOST }}" \
+            --user "${{ secrets.STAGING_SSH_USER }}" \
+            --key staging.key \
+            --deploy-path "${{ secrets.STAGING_DEPLOY_PATH }}" \
+            --backend-image "${{ needs.build-images.outputs.backend-image }}" \
+            --frontend-image "${{ needs.build-images.outputs.frontend-image }}" \
+            --healthcheck-url "${{ secrets.STAGING_HEALTHCHECK_URL }}"
+
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Smoke tests
+        run: |
+          ./deployment/scripts/smoke-test.sh \
+            --base-url "${{ secrets.STAGING_SMOKE_TEST_URL }}" \
+            --smoke-path /api/v1/health
+
+  notify:
+    needs: [deploy, smoke]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Slack notification
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "Staging deploy *${{ github.sha }}* finished with deploy=${{ needs.deploy.result }} smoke=${{ needs.smoke.result }}. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
