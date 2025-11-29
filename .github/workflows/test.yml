@@ -1,0 +1,9 @@
+name: Test & Quality Gate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml

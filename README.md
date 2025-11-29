@@ -32,6 +32,7 @@ love-parser/
 | API contract | [`backend/API_SPEC.md`](./backend/API_SPEC.md) | Endpoints, schemas, auth requirements. |
 | Deployment | [`backend/DEPLOYMENT.md`](./backend/DEPLOYMENT.md) | Docker, env vars, Robokassa, SSL/TLS. |
 | Architecture | [`backend/ARCHITECTURE.md`](./backend/ARCHITECTURE.md) | Components, DB schema, diagrams, monitoring. |
+| CI/CD runbook | [`docs/ci-cd.md`](./docs/ci-cd.md) | Workflows, secrets, blue/green deployments, rollback & smoke tests. |
 | Developer workflow | [`backend/DEV_GUIDE.md`](./backend/DEV_GUIDE.md) | Local setup, tests, code style, Git workflow. |
 
 ## Requirements
@@ -84,6 +85,14 @@ The compose stack exposes:
 - PostgreSQL on `localhost:5432`
 - Redis on `localhost:6379`
 - Fastify API on `localhost:3000`
+
+## CI/CD & deployment automation
+
+- **GitHub Actions** now covers linting, strict TypeScript checks, Vitest unit/integration suites, code coverage (>80%), DB migrations, npm audit, OWASP Dependency Check, and frontend/backend builds on every push/PR (`.github/workflows/test.yml`).
+- **Docker images** for both apps are built from `backend/Dockerfile` and `frontend/Dockerfile` and pushed to GHCR on every Git tag, then scanned with Trivy (`docker-build.yml`).
+- **Staging deploys** trigger automatically from `develop` pushes, leveraging the blue/green script plus smoke tests against `https://staging.loveparser.ru` and Slack notifications.
+- **Production deploys** run on `main` or `release-*` tags, require environment approval, perform the same verifications, and send Slack + email notifications with automatic rollback on failure.
+- **Scripts** under `deployment/scripts/` (`deploy-blue-green.sh`, `smoke-test.sh`, `rollback.sh`) can be executed locally for manual recovery—see [`docs/ci-cd.md`](./docs/ci-cd.md) for usage.
 
 ## Notes
 

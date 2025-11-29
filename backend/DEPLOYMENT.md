@@ -2,6 +2,8 @@
 
 This document describes how to deploy the Love Parser backend (Fastify API + queue workers) together with its dependencies (PostgreSQL, Redis, Telegram, Robokassa). The backend process runs HTTP traffic, Bull queues, and cron jobs in a single Node.js service, so only one process per environment is required.
 
+> Looking for CI/CD, blue/green scripts, or secret management? See [`docs/ci-cd.md`](../docs/ci-cd.md) for the automation runbook.
+
 ## 1. Prerequisites
 
 - Linux host with Node.js 20 (or Docker runtime).

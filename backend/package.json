@@ -7,9 +7,15 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
     "start": "node dist/index.js",
-    "test": "vitest",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "test:watch": "vitest --watch",
-    "test:coverage": "vitest --coverage",
+    "test:unit": "vitest run src/__tests__/database src/__tests__/jobs src/__tests__/services src/__tests__/utils src/routes",
+    "test:integration": "vitest run src/__tests__/integration",
+    "test:coverage": "vitest run --coverage",
+    "db:wait": "tsx src/scripts/waitForDatabase.ts",
+    "redis:healthcheck": "tsx src/scripts/redisHealthcheck.ts",
     "db:migrate": "knex migrate:latest --knexfile knexfile.cjs",
     "db:rollback": "knex migrate:rollback --knexfile knexfile.cjs",
     "db:seed": "tsx src/scripts/seed.ts"
@@ -32,14 +38,19 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@eslint/js": "^9.32.0",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.16.5",
     "@types/supertest": "^2.0.16",
+    "eslint": "^9.32.0",
+    "globals": "^15.15.0",
     "pg-mem": "^3.0.5",
     "supertest": "^6.3.4",
     "tsc-alias": "^1.8.10",
     "tsx": "^4.19.2",
     "typescript": "^5.8.3",
+    "typescript-eslint": "^8.38.0",
+    "vite-tsconfig-paths": "^5.1.2",
     "vitest": "^2.1.5"
   }
 }
