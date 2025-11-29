@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: love-parser-dashboards
+    folder: Love Parser
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

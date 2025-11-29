@@ -1,6 +1,7 @@
 import { Job } from "bull";
 
 import { ParseSearchJob } from "@/jobs/parseSearchJob";
+import { recordParsingJobResult } from "@/monitoring/prometheus";
 import { persistParsedChannels, markParsingStatus } from "@/services/parsing/parsing.service";
 import { saveParsingProgress } from "@/services/parsing/progress.service";
 import { incrementParsingUsage } from "@/services/parsing/usage.service";
@@ -58,6 +59,7 @@ export async function handleParsingJob(job: Job<ParseSearchJob>) {
     });
 
     logger.info("Parsing job finished", { jobId: job.id, requestId, searchId, savedCount });
+    recordParsingJobResult("completed");
 
     return {
       searchId,
@@ -73,6 +75,7 @@ export async function handleParsingJob(job: Job<ParseSearchJob>) {
     });
 
     await updateProgress(job, searchId, "failed", 100, { error: message });
+    recordParsingJobResult("failed");
 
     logger.error("Parsing job failed", { jobId: job.id, requestId, searchId, error });
     throw error;

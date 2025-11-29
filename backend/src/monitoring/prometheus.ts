@@ -4,12 +4,14 @@ import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from "prom
 
 import { JobTypes } from "@/jobs/jobTypes";
 import { logger } from "@/monitoring/errorLogger";
-import { pgPool } from "@/utils/clients";
 import { getRegisteredQueues } from "@/queue/queueManager";
-import { getRedisPoolStats } from "@/services/redis.service";
+import { REDIS_POOL_MAX_CONNECTIONS, getRedisPoolStats } from "@/services/redis.service";
+import { pgPool } from "@/utils/clients";
 
 export const metricsRegistry = new Registry();
 collectDefaultMetrics({ register: metricsRegistry });
+
+const DATABASE_POOL_DEFAULT_MAX = 20;
 
 export const httpRequestsTotal = new Counter({
   name: "http_requests_total",
@@ -58,9 +60,27 @@ export const databaseConnectionsGauge = new Gauge({
   registers: [metricsRegistry],
 });
 
+export const databaseConnectionsMaxGauge = new Gauge({
+  name: "database_connections_max",
+  help: "Maximum configured PostgreSQL connections",
+  registers: [metricsRegistry],
+});
+
 export const redisConnectionsGauge = new Gauge({
   name: "redis_connections_active",
   help: "Active Redis connections",
+  registers: [metricsRegistry],
+});
+
+export const redisConnectionsCapacityGauge = new Gauge({
+  name: "redis_connections_capacity",
+  help: "Maximum Redis connections available in the pool",
+  registers: [metricsRegistry],
+});
+
+export const redisPendingRequestsGauge = new Gauge({
+  name: "redis_pool_pending_requests",
+  help: "Number of pending waiters for a Redis client",
   registers: [metricsRegistry],
 });
 
@@ -68,6 +88,28 @@ export const jobQueueSizeGauge = new Gauge({
   name: "job_queue_size",
   help: "Bull queue size grouped by queue type",
   labelNames: ["queue"],
+  registers: [metricsRegistry],
+});
+
+export const jobQueueLastCompletedGauge = new Gauge({
+  name: "job_queue_last_completed_timestamp",
+  help: "Unix timestamp of the last completed job per queue",
+  labelNames: ["queue"],
+  registers: [metricsRegistry],
+});
+
+export const jobEventsCounter = new Counter({
+  name: "job_events_total",
+  help: "Total Bull job events grouped by queue and status",
+  labelNames: ["queue", "status"],
+  registers: [metricsRegistry],
+});
+
+export const jobDurationHistogram = new Histogram({
+  name: "job_duration_seconds",
+  help: "Duration of Bull job executions",
+  labelNames: ["queue", "status"],
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300],
   registers: [metricsRegistry],
 });
 
@@ -92,6 +134,27 @@ export const cronJobDurationHistogram = new Histogram({
   registers: [metricsRegistry],
 });
 
+export const parsingJobsCounter = new Counter({
+  name: "parsing_jobs_total",
+  help: "Parsing jobs result counter",
+  labelNames: ["status"],
+  registers: [metricsRegistry],
+});
+
+export const audienceSegmentsCounter = new Counter({
+  name: "audience_segments_total",
+  help: "Audience segments processed grouped by status",
+  labelNames: ["status"],
+  registers: [metricsRegistry],
+});
+
+export const paymentEventsCounter = new Counter({
+  name: "payment_events_total",
+  help: "Payment webhook events grouped by status and provider",
+  labelNames: ["status", "provider"],
+  registers: [metricsRegistry],
+});
+
 export function recordTelegramApiCall(method: string) {
   telegramApiCallsTotal.labels(method).inc();
 }
@@ -112,6 +175,30 @@ export function recordBroadcastFailure(count = 1) {
     return;
   }
   broadcastFailedTotal.inc(count);
+}
+
+export function recordParsingJobResult(status: "completed" | "failed") {
+  parsingJobsCounter.labels(status).inc();
+}
+
+export function recordAudienceSegmentResult(status: "ready" | "failed") {
+  audienceSegmentsCounter.labels(status).inc();
+}
+
+export function recordPaymentEvent(status: "pending" | "completed" | "failed", provider = "robokassa") {
+  paymentEventsCounter.labels(status, provider).inc();
+}
+
+export function recordQueueJobEvent(jobType: JobTypes, status: "completed" | "failed", durationSeconds?: number) {
+  jobEventsCounter.labels(jobType, status).inc();
+
+  if (typeof durationSeconds === "number" && Number.isFinite(durationSeconds) && durationSeconds >= 0) {
+    jobDurationHistogram.labels(jobType, status).observe(durationSeconds);
+  }
+
+  if (status === "completed") {
+    jobQueueLastCompletedGauge.labels(jobType).set(Date.now() / 1000);
+  }
 }
 
 const RESOURCE_COLLECTION_INTERVAL_MS = 10_000;
@@ -171,10 +258,16 @@ export function registerPrometheusMiddleware(app: FastifyInstance) {
   });
 }
 
+function resolvePoolMaxConnections() {
+  const poolOptions = (pgPool as typeof pgPool & { options?: { max?: number } }).options;
+  return poolOptions?.max ?? DATABASE_POOL_DEFAULT_MAX;
+}
+
 async function updateDatabaseMetrics() {
   try {
     const activeConnections = Math.max(pgPool.totalCount - pgPool.idleCount, 0);
     databaseConnectionsGauge.set(activeConnections);
+    databaseConnectionsMaxGauge.set(resolvePoolMaxConnections());
   } catch (error) {
     logger.warn("Failed to update database metrics", { error });
   }
@@ -184,6 +277,8 @@ async function updateRedisMetrics() {
   try {
     const stats = getRedisPoolStats();
     redisConnectionsGauge.set(stats.inUse);
+    redisPendingRequestsGauge.set(stats.pending);
+    redisConnectionsCapacityGauge.set(REDIS_POOL_MAX_CONNECTIONS);
   } catch (error) {
     logger.warn("Failed to update redis metrics", { error });
   }
@@ -229,12 +324,19 @@ async function collectResourceMetrics() {
   await Promise.all([updateDatabaseMetrics(), updateRedisMetrics(), updateSubscriptionMetrics(), updateJobQueueMetrics()]);
 }
 
+function seedQueueCompletionMetrics() {
+  Object.values(JobTypes).forEach((jobType) => {
+    jobQueueLastCompletedGauge.labels(jobType).set(Date.now() / 1000);
+  });
+}
+
 export function startMonitoringCollectors() {
   if (collectorsRunning) {
     return;
   }
 
   collectorsRunning = true;
+  seedQueueCompletionMetrics();
   void collectResourceMetrics();
   resourceCollector = setInterval(() => {
     void collectResourceMetrics();

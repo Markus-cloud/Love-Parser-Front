@@ -1,0 +1,89 @@
+groups:
+  - name: love-parser-production
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{outcome!="success"}[5m])) / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP error rate > 5%"
+          description: "Investigate recent deploys, check Fastify logs in Loki, and validate upstream dependencies."
+          runbook: "monitoring/RUNBOOK.md#high-error-rate"
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 latency is above 1s"
+          description: "Check DB/Redis health and long-running handlers."
+          runbook: "monitoring/RUNBOOK.md#high-latency"
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: database_connections_active / database_connections_max > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          notify_sms: "true"
+        annotations:
+          summary: "PostgreSQL pool is almost exhausted"
+          description: "Scale the backend pods or increase pg pool size before requests start failing."
+          runbook: "monitoring/RUNBOOK.md#database-connection-pool-exhausted"
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          notify_sms: "true"
+        annotations:
+          summary: "Redis exporter cannot reach the cache"
+          description: "Check Redis process, network ACLs, or certificates."
+          runbook: "monitoring/RUNBOOK.md#redis-down"
+
+      - alert: BroadcastQueueStuck
+        expr: time() - job_queue_last_completed_timestamp{queue="broadcast"} > 1800
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Broadcast queue made no progress for 30 minutes"
+          description: "Inspect Bull worker logs and Redis health; jobs may be blocked by failures."
+          runbook: "monitoring/RUNBOOK.md#broadcast-queue-stuck"
+
+      - alert: PaymentCallbackFailure
+        expr: increase(payment_events_total{status="failed",provider="robokassa"}[15m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          notify_sms: "true"
+        annotations:
+          summary: "Robokassa webhooks are failing"
+          description: "Confirm Robokassa status page, inspect /subscriptions/webhook logs, and replay payloads if needed."
+          runbook: "monitoring/RUNBOOK.md#payment-callback-failure"
+
+      - alert: DiskSpaceRunningLow
+        expr: |
+          100 * (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"}
+                 / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay"}) < 20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Root filesystem has less than 20% free space"
+          description: "Prune Docker images/logs or expand the disk before services crash."
+          runbook: "monitoring/RUNBOOK.md#disk-space-running-low"
+
+      - alert: MemoryUsageHigh
+        expr: 100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "System memory usage above 85%"
+          description: "Check processes via node exporter / top, and consider scaling out."
+          runbook: "monitoring/RUNBOOK.md#memory-usage-high"

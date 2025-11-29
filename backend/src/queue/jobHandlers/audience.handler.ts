@@ -1,6 +1,7 @@
 import { Job } from "bull";
 
 import { AudienceSegmentJob } from "@/jobs/audienceJob";
+import { recordAudienceSegmentResult } from "@/monitoring/prometheus";
 import { calculateTotalRecipients, getSegment } from "@/services/audience/audienceService";
 import { invalidateDashboardCache } from "@/services/dashboard/dashboard.service";
 import { pgPool } from "@/utils/clients";
@@ -27,6 +28,7 @@ export async function handleAudienceJob(job: Job<AudienceSegmentJob>) {
 
     if (!segment.sourceParsingId) {
       await persistSegmentTotals(segmentId, userId, 0, "failed");
+      recordAudienceSegmentResult("failed");
       await job.progress(100);
       logger.warn("Audience segment is missing parsing source", { segmentId, userId });
       return { segmentId, totalRecipients: 0 };
@@ -44,10 +46,12 @@ export async function handleAudienceJob(job: Job<AudienceSegmentJob>) {
     await job.progress(100);
 
     logger.info("Audience segment job completed", { jobId: job.id, segmentId, totalRecipients });
+    recordAudienceSegmentResult("ready");
     return { segmentId, totalRecipients };
   } catch (error) {
     logger.error("Audience segment job failed", { jobId: job.id, segmentId, userId, error });
     await persistSegmentTotals(segmentId, userId, 0, "failed");
+    recordAudienceSegmentResult("failed");
     throw error;
   }
 }

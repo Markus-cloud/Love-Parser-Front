@@ -4,6 +4,7 @@ import { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 import { generatePaymentURL, getMerchantConfig, verifySignature, formatRobokassaAmount } from "@/integrations/robokassa";
+import { recordPaymentEvent } from "@/monitoring/prometheus";
 import { getCurrentUser } from "@/middleware/getCurrentUser";
 import { validateRequest } from "@/middleware/validateRequest";
 import { verifyJWT } from "@/middleware/verifyJWT";
@@ -155,6 +156,7 @@ async function persistPayment(orderId: string, plan: SubscriptionPlan, userId: s
     ],
   );
 
+  recordPaymentEvent("pending", "robokassa");
   return result.rows[0].id;
 }
 
@@ -241,98 +243,109 @@ export async function registerSubscriptionRoutes(app: FastifyInstance) {
         });
       }
 
-      const client = await pgPool.connect();
       let affectedUserId: string | null = null;
+      let paymentCompleted = false;
 
       try {
-        await client.query("BEGIN");
+        const client = await pgPool.connect();
+        try {
+          await client.query("BEGIN");
 
-        const paymentResult = await client.query<PaymentRow>(
-          `SELECT id, user_id, status, payload, subscription_id
-           FROM payments
-           WHERE transaction_id = $1
-           LIMIT 1
-           FOR UPDATE`,
-          [body.InvId],
-        );
+          const paymentResult = await client.query<PaymentRow>(
+            `SELECT id, user_id, status, payload, subscription_id
+             FROM payments
+             WHERE transaction_id = $1
+             LIMIT 1
+             FOR UPDATE`,
+            [body.InvId],
+          );
 
-        if (paymentResult.rowCount === 0) {
-          throw new NotFoundError("Payment not found", { orderId: body.InvId });
-        }
+          if (paymentResult.rowCount === 0) {
+            throw new NotFoundError("Payment not found", { orderId: body.InvId });
+          }
 
-        const payment = paymentResult.rows[0];
-        affectedUserId = payment.user_id;
+          const payment = paymentResult.rows[0];
+          affectedUserId = payment.user_id;
 
-        if (payment.status === "completed") {
-          await client.query("COMMIT");
-          return { result: "OK" };
-        }
+          if (payment.status === "completed") {
+            await client.query("COMMIT");
+            return { result: "OK" };
+          }
 
-        const paymentPayload = parseJsonObject(payment.payload);
-        const planType = extractPlanType(paymentPayload);
-        const plan = getPlanByType(planType);
+          const paymentPayload = parseJsonObject(payment.payload);
+          const planType = extractPlanType(paymentPayload);
+          const plan = getPlanByType(planType);
 
-        const existingSubscription = await getSubscriptionByUserId(payment.user_id, client);
-        const { startsAt, expiresAt } = calculatePlanExpiration(existingSubscription, plan);
+          const existingSubscription = await getSubscriptionByUserId(payment.user_id, client);
+          const { startsAt, expiresAt } = calculatePlanExpiration(existingSubscription, plan);
 
-        const metadataPatch = {
-          ...(existingSubscription?.metadata ?? {}),
-          ...(paymentPayload ?? {}),
-          plan_type: plan.type,
-          plan_name: plan.name,
-          source: paymentPayload?.source ?? "robokassa",
-          renewal: "manual",
-          autoRenew: false,
-          last_payment_id: payment.id,
-        } satisfies Record<string, unknown>;
+          const metadataPatch = {
+            ...(existingSubscription?.metadata ?? {}),
+            ...(paymentPayload ?? {}),
+            plan_type: plan.type,
+            plan_name: plan.name,
+            source: paymentPayload?.source ?? "robokassa",
+            renewal: "manual",
+            autoRenew: false,
+            last_payment_id: payment.id,
+          } satisfies Record<string, unknown>;
 
-        const subscription = existingSubscription
-          ? await updateSubscription(existingSubscription.id, {
-              planCode: plan.type,
-              planName: plan.name,
-              status: "active",
-              startedAt,
-              expiresAt,
-              metadata: metadataPatch,
-            }, client)
-          : await createSubscription(
-              {
-                userId: payment.user_id,
+          const subscription = existingSubscription
+            ? await updateSubscription(existingSubscription.id, {
                 planCode: plan.type,
                 planName: plan.name,
                 status: "active",
                 startedAt,
                 expiresAt,
                 metadata: metadataPatch,
-              },
-              client,
-            );
+              }, client)
+            : await createSubscription(
+                {
+                  userId: payment.user_id,
+                  planCode: plan.type,
+                  planName: plan.name,
+                  status: "active",
+                  startedAt,
+                  expiresAt,
+                  metadata: metadataPatch,
+                },
+                client,
+              );
 
-        await applyUsageLimitsForPlan(payment.user_id, plan, expiresAt, client);
+          await applyUsageLimitsForPlan(payment.user_id, plan, expiresAt, client);
 
-        await client.query(
-          `UPDATE payments
-           SET status = 'completed',
-               paid_at = NOW(),
-               subscription_id = $2,
-               payload = COALESCE(payload, '{}'::jsonb) || $3::jsonb
-           WHERE id = $1`,
-          [payment.id, subscription.id, JSON.stringify({ webhook: { InvId: body.InvId, Sum: normalizedAmount } })],
-        );
+          await client.query(
+            `UPDATE payments
+             SET status = 'completed',
+                 paid_at = NOW(),
+                 subscription_id = $2,
+                 payload = COALESCE(payload, '{}'::jsonb) || $3::jsonb
+             WHERE id = $1`,
+            [payment.id, subscription.id, JSON.stringify({ webhook: { InvId: body.InvId, Sum: normalizedAmount } })],
+          );
 
-        await client.query("COMMIT");
+          await client.query("COMMIT");
+          paymentCompleted = true;
+        } catch (error) {
+          await client.query("ROLLBACK");
+          throw error;
+        } finally {
+          client.release();
+        }
+
+        if (affectedUserId) {
+          await invalidateDashboardCache(affectedUserId);
+        }
+
+        if (paymentCompleted) {
+          recordPaymentEvent("completed", "robokassa");
+        }
+
+        return { result: "OK" };
       } catch (error) {
-        await client.query("ROLLBACK");
+        recordPaymentEvent("failed", "robokassa");
         throw error;
-      } finally {
-        client.release();
       }
-
-      if (affectedUserId) {
-        await invalidateDashboardCache(affectedUserId);
-      }
-
-      return { result: "OK" };
     },
   );
 }

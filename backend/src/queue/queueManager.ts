@@ -1,8 +1,9 @@
-import Queue, { QueueOptions } from "bull";
+import Queue, { Job, QueueOptions } from "bull";
 
 import { config } from "@/config/config";
 import { JobPayloadMap, JobTypes } from "@/jobs/jobTypes";
 import { logErrorEvent } from "@/monitoring/errorLogService";
+import { recordQueueJobEvent } from "@/monitoring/prometheus";
 import { logger } from "@/utils/logger";
 
 type QueueRegistry = {
@@ -31,6 +32,16 @@ const baseQueueOptions: QueueOptions = {
 
 const redisConnectionString = config.redis.url;
 
+function getJobDurationSeconds(job: Job): number | undefined {
+  const finishedOn = typeof job.finishedOn === "number" ? job.finishedOn : Date.now();
+  const startedAt = typeof job.processedOn === "number" ? job.processedOn : job.timestamp ?? finishedOn;
+  const durationMs = Math.max(finishedOn - startedAt, 0);
+  if (!Number.isFinite(durationMs)) {
+    return undefined;
+  }
+  return durationMs / 1000;
+}
+
 function attachEventListeners<T>(queue: Queue<T>, jobType: JobTypes) {
   queue.on("progress", (job, progress) => {
     logger.debug(`Job progress updated`, { jobType, jobId: job.id, progress });
@@ -38,9 +49,13 @@ function attachEventListeners<T>(queue: Queue<T>, jobType: JobTypes) {
 
   queue.on("completed", (job, result) => {
     logger.info(`Job completed`, { jobType, jobId: job.id, result });
+    const durationSeconds = getJobDurationSeconds(job as Job);
+    recordQueueJobEvent(jobType, "completed", durationSeconds);
   });
 
   queue.on("failed", (job, error) => {
+    const durationSeconds = job ? getJobDurationSeconds(job as Job) : undefined;
+    recordQueueJobEvent(jobType, "failed", durationSeconds);
     void logErrorEvent(error, {
       message: "Job failed",
       service: "queue",
