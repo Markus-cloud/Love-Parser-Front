@@ -1,7 +1,7 @@
 import { Job } from "bull";
 
 import { AudienceSegmentJob } from "@/jobs/audienceJob";
-import { calculateTotalRecipients, getSegment } from "@/services/audience/audienceService";
+import { calculateTotalRecipients, getSegment, invalidateSegmentCache } from "@/services/audience/audienceService";
 import { invalidateDashboardCache } from "@/services/dashboard/dashboard.service";
 import { pgPool } from "@/utils/clients";
 import { logger } from "@/utils/logger";
@@ -27,6 +27,7 @@ export async function handleAudienceJob(job: Job<AudienceSegmentJob>) {
 
     if (!segment.sourceParsingId) {
       await persistSegmentTotals(segmentId, userId, 0, "failed");
+      await invalidateSegmentCache(userId, segmentId);
       await job.progress(100);
       logger.warn("Audience segment is missing parsing source", { segmentId, userId });
       return { segmentId, totalRecipients: 0 };
@@ -40,6 +41,7 @@ export async function handleAudienceJob(job: Job<AudienceSegmentJob>) {
 
     await job.progress(70);
     await persistSegmentTotals(segmentId, userId, totalRecipients, "ready");
+    await invalidateSegmentCache(userId, segmentId);
     await invalidateDashboardCache(userId);
     await job.progress(100);
 
@@ -48,6 +50,7 @@ export async function handleAudienceJob(job: Job<AudienceSegmentJob>) {
   } catch (error) {
     logger.error("Audience segment job failed", { jobId: job.id, segmentId, userId, error });
     await persistSegmentTotals(segmentId, userId, 0, "failed");
+    await invalidateSegmentCache(userId, segmentId);
     throw error;
   }
 }

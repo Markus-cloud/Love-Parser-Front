@@ -1,7 +1,9 @@
 import type { Pool, PoolClient } from "pg";
 
+import { withRedisClient } from "@/services/redis.service";
 import { pgPool } from "@/utils/clients";
 import { NotFoundError, ValidationError } from "@/utils/errors";
+import { logger } from "@/utils/logger";
 
 export type SubscriptionPlanType = "free" | "week" | "month" | "year";
 
@@ -110,6 +112,94 @@ const LIMIT_KEY_MAPPINGS: Record<keyof SubscriptionPlanLimits, string[]> = {
   broadcast: ["broadcast_campaigns", "broadcast_messages"],
 };
 
+const SUBSCRIPTION_CACHE_PREFIX = "subscription:current";
+const SUBSCRIPTION_CACHE_TTL_SECONDS = 60 * 5;
+
+type SubscriptionCacheEntry = {
+  id: string;
+  userId: string;
+  planCode: string;
+  planName: string;
+  status: string;
+  startedAt: string;
+  expiresAt: string;
+  metadata: Record<string, unknown> | null;
+};
+
+function buildSubscriptionCacheKey(userId: string) {
+  return `${SUBSCRIPTION_CACHE_PREFIX}:${userId}`;
+}
+
+function serializeSubscriptionRecord(record: SubscriptionRecord): SubscriptionCacheEntry {
+  return {
+    id: record.id,
+    userId: record.userId,
+    planCode: record.planCode,
+    planName: record.planName,
+    status: record.status,
+    startedAt: record.startedAt.toISOString(),
+    expiresAt: record.expiresAt.toISOString(),
+    metadata: record.metadata ?? null,
+  } satisfies SubscriptionCacheEntry;
+}
+
+function deserializeSubscriptionRecord(payload: SubscriptionCacheEntry): SubscriptionRecord {
+  return {
+    id: payload.id,
+    userId: payload.userId,
+    planCode: payload.planCode,
+    planName: payload.planName,
+    status: payload.status,
+    startedAt: new Date(payload.startedAt),
+    expiresAt: new Date(payload.expiresAt),
+    metadata: payload.metadata ?? null,
+  } satisfies SubscriptionRecord;
+}
+
+async function readSubscriptionCache(userId: string): Promise<SubscriptionRecord | null | undefined> {
+  const cacheKey = buildSubscriptionCacheKey(userId);
+  try {
+    const raw = await withRedisClient((client) => client.get(cacheKey));
+    if (raw === null) {
+      return undefined;
+    }
+
+    const parsed = JSON.parse(raw) as SubscriptionCacheEntry | null;
+    if (!parsed) {
+      return null;
+    }
+
+    return deserializeSubscriptionRecord(parsed);
+  } catch (error) {
+    logger.warn("Failed to read subscription cache", { userId, error });
+    try {
+      await withRedisClient((client) => client.del(cacheKey));
+    } catch (cleanupError) {
+      logger.warn("Failed to reset subscription cache key", { userId, cleanupError });
+    }
+    return undefined;
+  }
+}
+
+async function writeSubscriptionCache(userId: string, record: SubscriptionRecord | null) {
+  const cacheKey = buildSubscriptionCacheKey(userId);
+  try {
+    const payload = record ? JSON.stringify(serializeSubscriptionRecord(record)) : "null";
+    await withRedisClient((client) => client.setEx(cacheKey, SUBSCRIPTION_CACHE_TTL_SECONDS, payload));
+  } catch (error) {
+    logger.warn("Failed to write subscription cache", { userId, error });
+  }
+}
+
+export async function invalidateSubscriptionCache(userId: string) {
+  const cacheKey = buildSubscriptionCacheKey(userId);
+  try {
+    await withRedisClient((client) => client.del(cacheKey));
+  } catch (error) {
+    logger.warn("Failed to invalidate subscription cache", { userId, error });
+  }
+}
+
 type Queryable = Pool | PoolClient;
 
 function resolveClient(client?: Queryable): Queryable {
@@ -211,7 +301,9 @@ export async function createSubscription(input: CreateSubscriptionInput, client?
     ],
   );
 
-  return mapSubscriptionRow(result.rows[0]);
+  const subscription = mapSubscriptionRow(result.rows[0]);
+  await invalidateSubscriptionCache(input.userId);
+  return subscription;
 }
 
 export interface UpdateSubscriptionInput {
@@ -287,10 +379,19 @@ export async function updateSubscription(
     throw new NotFoundError("Subscription not found", { subscriptionId });
   }
 
-  return mapSubscriptionRow(result.rows[0]);
+  const subscription = mapSubscriptionRow(result.rows[0]);
+  await invalidateSubscriptionCache(subscription.userId);
+  return subscription;
 }
 
 export async function getSubscriptionByUserId(userId: string, client?: Queryable): Promise<SubscriptionRecord | null> {
+  if (!client) {
+    const cached = await readSubscriptionCache(userId);
+    if (cached !== undefined) {
+      return cached;
+    }
+  }
+
   const queryable = resolveClient(client);
   const result = await queryable.query<SubscriptionRow>(
     `SELECT id, user_id, plan_code, plan_name, status, started_at, expires_at, metadata
@@ -301,11 +402,13 @@ export async function getSubscriptionByUserId(userId: string, client?: Queryable
     [userId],
   );
 
-  if (result.rowCount === 0) {
-    return null;
+  const subscription = result.rowCount === 0 ? null : mapSubscriptionRow(result.rows[0]);
+
+  if (!client) {
+    await writeSubscriptionCache(userId, subscription);
   }
 
-  return mapSubscriptionRow(result.rows[0]);
+  return subscription;
 }
 
 export function checkSubscriptionExpired(subscription: SubscriptionRecord | null | undefined): boolean {

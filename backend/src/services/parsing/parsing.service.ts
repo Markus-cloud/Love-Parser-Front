@@ -1,4 +1,7 @@
+import { randomUUID } from "node:crypto";
+
 import { ParsedChannel, NormalizedParsingFilters, ParsingHistoryEntry, ParsingStatus, SearchMode } from "@/types/parsing";
+import { withRedisClient } from "@/services/redis.service";
 import { pgPool } from "@/utils/clients";
 import { logger } from "@/utils/logger";
 
@@ -27,6 +30,107 @@ interface UsageMetadata {
   mode?: SearchMode;
   jobId?: string | number;
   [key: string]: unknown;
+}
+
+const PARSING_RESULTS_CACHE_PREFIX = "parsing:results";
+const PARSING_EXPORT_CACHE_PREFIX = "parsing:results:export";
+const PARSING_RESULTS_VERSION_PREFIX = "parsing:results:version";
+const PARSING_RESULTS_CACHE_TTL_SECONDS = 60 * 30;
+const PARSING_RESULTS_VERSION_TTL_SECONDS = 60 * 60 * 24;
+
+function buildVersionKey(searchId: string) {
+  return `${PARSING_RESULTS_VERSION_PREFIX}:${searchId}`;
+}
+
+async function resolveResultsCacheVersion(searchId: string): Promise<string> {
+  const versionKey = buildVersionKey(searchId);
+  try {
+    const existing = await withRedisClient((client) => client.get(versionKey));
+    if (existing) {
+      return existing;
+    }
+
+    const version = randomUUID();
+    await withRedisClient((client) => client.setEx(versionKey, PARSING_RESULTS_VERSION_TTL_SECONDS, version));
+    return version;
+  } catch (error) {
+    logger.warn("Failed to resolve parsing results cache version", { searchId, error });
+    return randomUUID();
+  }
+}
+
+function buildPaginatedCacheKey(
+  searchId: string,
+  userId: string,
+  sortBy: SortField,
+  page: number,
+  limit: number,
+  version: string,
+) {
+  return `${PARSING_RESULTS_CACHE_PREFIX}:${searchId}:${version}:${userId}:${sortBy}:${page}:${limit}`;
+}
+
+function buildExportCacheKey(searchId: string, userId: string, version: string) {
+  return `${PARSING_EXPORT_CACHE_PREFIX}:${searchId}:${version}:${userId}`;
+}
+
+async function readPaginatedResultsCache(cacheKey: string): Promise<PaginatedParsedChannels | null> {
+  try {
+    const raw = await withRedisClient((client) => client.get(cacheKey));
+    if (!raw) {
+      return null;
+    }
+
+    return JSON.parse(raw) as PaginatedParsedChannels;
+  } catch (error) {
+    logger.warn("Failed to read parsing results cache", { cacheKey, error });
+    await withRedisClient((client) => client.del(cacheKey)).catch((cleanupError) => {
+      logger.warn("Failed to drop parsing results cache key", { cacheKey, cleanupError });
+    });
+    return null;
+  }
+}
+
+async function writePaginatedResultsCache(cacheKey: string, payload: PaginatedParsedChannels) {
+  try {
+    await withRedisClient((client) => client.setEx(cacheKey, PARSING_RESULTS_CACHE_TTL_SECONDS, JSON.stringify(payload)));
+  } catch (error) {
+    logger.warn("Failed to write parsing results cache", { cacheKey, error });
+  }
+}
+
+async function readFullResultsCache(cacheKey: string): Promise<ParsedChannel[] | null> {
+  try {
+    const raw = await withRedisClient((client) => client.get(cacheKey));
+    if (!raw) {
+      return null;
+    }
+
+    return JSON.parse(raw) as ParsedChannel[];
+  } catch (error) {
+    logger.warn("Failed to read parsing export cache", { cacheKey, error });
+    await withRedisClient((client) => client.del(cacheKey)).catch((cleanupError) => {
+      logger.warn("Failed to drop parsing export cache key", { cacheKey, cleanupError });
+    });
+    return null;
+  }
+}
+
+async function writeFullResultsCache(cacheKey: string, payload: ParsedChannel[]) {
+  try {
+    await withRedisClient((client) => client.setEx(cacheKey, PARSING_RESULTS_CACHE_TTL_SECONDS, JSON.stringify(payload)));
+  } catch (error) {
+    logger.warn("Failed to write parsing export cache", { cacheKey, error });
+  }
+}
+
+async function invalidateParsingResultsCache(searchId: string) {
+  const versionKey = buildVersionKey(searchId);
+  try {
+    await withRedisClient((client) => client.del(versionKey));
+  } catch (error) {
+    logger.warn("Failed to invalidate parsing results cache", { searchId, error });
+  }
 }
 
 export interface PaginatedParsedChannels {
@@ -232,6 +336,7 @@ export async function persistParsedChannels(searchId: string, channels: ParsedCh
     }
 
     await client.query("COMMIT");
+    await invalidateParsingResultsCache(searchId);
     return channels.length;
   } catch (error) {
     await client.query("ROLLBACK");
