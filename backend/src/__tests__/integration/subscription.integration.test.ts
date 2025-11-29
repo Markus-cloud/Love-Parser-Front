@@ -20,13 +20,41 @@ vi.mock("@/middleware/getCurrentUser", () => ({
   }),
 }));
 
-const mockGetAvailablePlans = vi.fn();
-const mockGetPlanByType = vi.fn();
-const mockGetSubscriptionByUserId = vi.fn();
-const mockUpdateSubscription = vi.fn();
-const mockCreateSubscription = vi.fn();
-const mockApplyUsageLimitsForPlan = vi.fn();
-const mockCalculatePlanExpiration = vi.fn();
+const {
+  mockGetAvailablePlans,
+  mockGetPlanByType,
+  mockGetSubscriptionByUserId,
+  mockUpdateSubscription,
+  mockCreateSubscription,
+  mockApplyUsageLimitsForPlan,
+  mockCalculatePlanExpiration,
+  mockGeneratePaymentURL,
+  mockGetMerchantConfig,
+  mockVerifySignature,
+  mockFormatRobokassaAmount,
+  mockInvalidateDashboardCache,
+  poolQueryMock,
+  poolConnectMock,
+  clientQueryMock,
+  clientReleaseMock,
+} = vi.hoisted(() => ({
+  mockGetAvailablePlans: vi.fn(),
+  mockGetPlanByType: vi.fn(),
+  mockGetSubscriptionByUserId: vi.fn(),
+  mockUpdateSubscription: vi.fn(),
+  mockCreateSubscription: vi.fn(),
+  mockApplyUsageLimitsForPlan: vi.fn(),
+  mockCalculatePlanExpiration: vi.fn(),
+  mockGeneratePaymentURL: vi.fn(),
+  mockGetMerchantConfig: vi.fn(),
+  mockVerifySignature: vi.fn(),
+  mockFormatRobokassaAmount: vi.fn(),
+  mockInvalidateDashboardCache: vi.fn(),
+  poolQueryMock: vi.fn(),
+  poolConnectMock: vi.fn(),
+  clientQueryMock: vi.fn(),
+  clientReleaseMock: vi.fn(),
+}));
 
 vi.mock("@/services/subscription/subscriptionService", () => ({
   getAvailablePlans: mockGetAvailablePlans,
@@ -39,11 +67,6 @@ vi.mock("@/services/subscription/subscriptionService", () => ({
   checkSubscriptionExpired: vi.fn(),
 }));
 
-const mockGeneratePaymentURL = vi.fn();
-const mockGetMerchantConfig = vi.fn();
-const mockVerifySignature = vi.fn();
-const mockFormatRobokassaAmount = vi.fn();
-
 vi.mock("@/integrations/robokassa", () => ({
   generatePaymentURL: mockGeneratePaymentURL,
   getMerchantConfig: mockGetMerchantConfig,
@@ -51,16 +74,9 @@ vi.mock("@/integrations/robokassa", () => ({
   formatRobokassaAmount: mockFormatRobokassaAmount,
 }));
 
-const mockInvalidateDashboardCache = vi.fn();
-
 vi.mock("@/services/dashboard/dashboard.service", () => ({
   invalidateDashboardCache: mockInvalidateDashboardCache,
 }));
-
-const poolQueryMock = vi.fn();
-const poolConnectMock = vi.fn();
-const clientQueryMock = vi.fn();
-const clientReleaseMock = vi.fn();
 
 vi.mock("@/utils/clients", () => ({
   pgPool: {

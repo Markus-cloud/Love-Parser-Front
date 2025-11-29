@@ -7,18 +7,31 @@ import {
   startCampaign,
 } from "@/services/broadcast/broadcastService";
 
-const queryMock = vi.fn();
+const {
+  queryMock,
+  mockAssertCampaignQuota,
+  mockAssertMessageQuota,
+  mockIncrementCampaignUsage,
+  mockIncrementMessageUsage,
+  mockAddJob,
+  mockSaveBroadcastProgress,
+  mockReadBroadcastProgress,
+} = vi.hoisted(() => ({
+  queryMock: vi.fn(),
+  mockAssertCampaignQuota: vi.fn(),
+  mockAssertMessageQuota: vi.fn(),
+  mockIncrementCampaignUsage: vi.fn(),
+  mockIncrementMessageUsage: vi.fn(),
+  mockAddJob: vi.fn(),
+  mockSaveBroadcastProgress: vi.fn(),
+  mockReadBroadcastProgress: vi.fn(),
+}));
 
 vi.mock("@/utils/clients", () => ({
   pgPool: {
     query: queryMock,
   },
 }));
-
-const mockAssertCampaignQuota = vi.fn();
-const mockAssertMessageQuota = vi.fn();
-const mockIncrementCampaignUsage = vi.fn();
-const mockIncrementMessageUsage = vi.fn();
 
 vi.mock("@/services/broadcast/usage.service", () => ({
   assertBroadcastCampaignQuotaAvailable: mockAssertCampaignQuota,
@@ -27,14 +40,9 @@ vi.mock("@/services/broadcast/usage.service", () => ({
   incrementBroadcastMessageUsage: mockIncrementMessageUsage,
 }));
 
-const mockAddJob = vi.fn();
-
 vi.mock("@/utils/queueHelpers", () => ({
   addJob: mockAddJob,
 }));
-
-const mockSaveBroadcastProgress = vi.fn();
-const mockReadBroadcastProgress = vi.fn();
 
 vi.mock("@/services/broadcast/progress.service", () => ({
   saveBroadcastProgress: mockSaveBroadcastProgress,

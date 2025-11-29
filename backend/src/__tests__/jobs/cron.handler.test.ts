@@ -3,10 +3,17 @@ import type { Job } from "bull";
 
 import { handleCronJob } from "@/queue/jobHandlers/cron.handler";
 
-const mockGetCronJobByKey = vi.fn();
-const mockStartTimer = vi.fn();
-const mockStopTimer = vi.fn();
-const mockCounterInc = vi.fn();
+const {
+  mockGetCronJobByKey,
+  mockStartTimer,
+  mockStopTimer,
+  mockCounterInc,
+} = vi.hoisted(() => ({
+  mockGetCronJobByKey: vi.fn(),
+  mockStartTimer: vi.fn(),
+  mockStopTimer: vi.fn(),
+  mockCounterInc: vi.fn(),
+}));
 
 vi.mock("@/jobs/cron", () => ({
   getCronJobByKey: mockGetCronJobByKey,

@@ -23,22 +23,33 @@ vi.mock("@/services/auth/tokenBlacklist.service", () => ({
   blacklistToken: vi.fn().mockResolvedValue(undefined),
 }));
 
-const mockAssertActiveSubscription = vi.fn();
+const {
+  mockAssertActiveSubscription,
+  mockAddJob,
+  mockCreateSegment,
+  mockListSegments,
+  mockGetSegment,
+  mockUpdateSegment,
+  mockDeleteSegment,
+  mockGetSegmentPreview,
+} = vi.hoisted(() => ({
+  mockAssertActiveSubscription: vi.fn(),
+  mockAddJob: vi.fn(),
+  mockCreateSegment: vi.fn(),
+  mockListSegments: vi.fn(),
+  mockGetSegment: vi.fn(),
+  mockUpdateSegment: vi.fn(),
+  mockDeleteSegment: vi.fn(),
+  mockGetSegmentPreview: vi.fn(),
+}));
+
 vi.mock("@/services/parsing/usage.service", () => ({
   assertActiveSubscription: mockAssertActiveSubscription,
 }));
 
-const mockAddJob = vi.fn();
 vi.mock("@/utils/queueHelpers", () => ({
   addJob: mockAddJob,
 }));
-
-const mockCreateSegment = vi.fn();
-const mockListSegments = vi.fn();
-const mockGetSegment = vi.fn();
-const mockUpdateSegment = vi.fn();
-const mockDeleteSegment = vi.fn();
-const mockGetSegmentPreview = vi.fn();
 
 vi.mock("@/services/audience/audienceService", () => ({
   createSegment: mockCreateSegment,

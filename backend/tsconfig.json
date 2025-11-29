@@ -14,6 +14,7 @@
     "types": ["node", "vitest"],
     "baseUrl": "./src",
     "paths": {
+      "@/*": ["*"],
       "@/services/*": ["services/*"],
       "@/routes/*": ["routes/*"],
       "@/models/*": ["models/*"],

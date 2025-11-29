@@ -4,11 +4,19 @@ import type { Job } from "bull";
 import { ParseSearchJob } from "@/jobs/parseSearchJob";
 import { handleParsingJob } from "@/queue/jobHandlers/parsing.handler";
 
-const mockPersistParsedChannels = vi.fn();
-const mockMarkParsingStatus = vi.fn();
-const mockSaveParsingProgress = vi.fn();
-const mockIncrementParsingUsage = vi.fn();
-const mockSearchTelegramChannels = vi.fn();
+const {
+  mockPersistParsedChannels,
+  mockMarkParsingStatus,
+  mockSaveParsingProgress,
+  mockIncrementParsingUsage,
+  mockSearchTelegramChannels,
+} = vi.hoisted(() => ({
+  mockPersistParsedChannels: vi.fn(),
+  mockMarkParsingStatus: vi.fn(),
+  mockSaveParsingProgress: vi.fn(),
+  mockIncrementParsingUsage: vi.fn(),
+  mockSearchTelegramChannels: vi.fn(),
+}));
 
 vi.mock("@/services/parsing/parsing.service", () => ({
   persistParsedChannels: mockPersistParsedChannels,

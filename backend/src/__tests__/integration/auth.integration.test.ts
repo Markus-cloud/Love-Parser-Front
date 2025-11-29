@@ -14,10 +14,42 @@ vi.mock("@/middleware/rateLimitMiddleware", () => ({
   rateLimitMiddleware: vi.fn(),
 }));
 
-const tokenMock = {
-  isTokenBlacklisted: vi.fn().mockResolvedValue(false),
-  blacklistToken: vi.fn().mockResolvedValue(undefined),
-};
+const {
+  tokenMock,
+  mockBuildAuthUserResponse,
+  mockEnrichUserWithSubscription,
+  mockEnrichUserWithLimits,
+  mockEnsureFreeSubscription,
+  mockEnsureDefaultUsageLimits,
+  mockCreateUser,
+  mockGetUserByTelegramId,
+  mockUpdateTelegramProfile,
+  mockSendCode,
+  mockVerifyCode,
+  mockPersistSession,
+} = vi.hoisted(() => ({
+  tokenMock: {
+    isTokenBlacklisted: vi.fn().mockResolvedValue(false),
+    blacklistToken: vi.fn().mockResolvedValue(undefined),
+  },
+  mockBuildAuthUserResponse: vi.fn((user: { id: string }) => ({ id: user.id })),
+  mockEnrichUserWithSubscription: vi.fn(async (payload) => ({
+    ...payload,
+    subscription: { plan: "free" },
+  })),
+  mockEnrichUserWithLimits: vi.fn(async (payload) => ({
+    ...payload,
+    limits: { parsing: { limit: 10, used: 0 } },
+  })),
+  mockEnsureFreeSubscription: vi.fn(),
+  mockEnsureDefaultUsageLimits: vi.fn(),
+  mockCreateUser: vi.fn(),
+  mockGetUserByTelegramId: vi.fn(),
+  mockUpdateTelegramProfile: vi.fn(),
+  mockSendCode: vi.fn(),
+  mockVerifyCode: vi.fn(),
+  mockPersistSession: vi.fn(),
+}));
 
 vi.mock("@/services/auth/tokenBlacklist.service", () => tokenMock);
 
@@ -29,27 +61,11 @@ vi.mock("@/middleware/getCurrentUser", () => ({
   }),
 }));
 
-const mockBuildAuthUserResponse = vi.fn((user: { id: string }) => ({ id: user.id }));
-const mockEnrichUserWithSubscription = vi.fn(async (payload) => ({
-  ...payload,
-  subscription: { plan: "free" },
-}));
-const mockEnrichUserWithLimits = vi.fn(async (payload) => ({
-  ...payload,
-  limits: { parsing: { limit: 10, used: 0 } },
-}));
-
 vi.mock("@/services/auth/currentUser.service", () => ({
   buildAuthUserResponse: mockBuildAuthUserResponse,
   enrichUserWithSubscription: mockEnrichUserWithSubscription,
   enrichUserWithLimits: mockEnrichUserWithLimits,
 }));
-
-const mockEnsureFreeSubscription = vi.fn();
-const mockEnsureDefaultUsageLimits = vi.fn();
-const mockCreateUser = vi.fn();
-const mockGetUserByTelegramId = vi.fn();
-const mockUpdateTelegramProfile = vi.fn();
 
 vi.mock("@/services/user/userService", () => ({
   ensureFreeSubscription: mockEnsureFreeSubscription,
@@ -58,10 +74,6 @@ vi.mock("@/services/user/userService", () => ({
   getUserByTelegramId: mockGetUserByTelegramId,
   updateTelegramProfile: mockUpdateTelegramProfile,
 }));
-
-const mockSendCode = vi.fn();
-const mockVerifyCode = vi.fn();
-const mockPersistSession = vi.fn();
 
 vi.mock("@/services/telegram/sessionManager", () => ({
   TelegramSessionManager: vi.fn().mockImplementation(() => ({
