@@ -3,8 +3,10 @@ import type { Job } from "bull";
 
 import { handleBroadcastJob } from "@/queue/jobHandlers/broadcast.handler";
 
-const mockRecordSuccess = vi.fn();
-const mockRecordFailure = vi.fn();
+const { mockRecordSuccess, mockRecordFailure } = vi.hoisted(() => ({
+  mockRecordSuccess: vi.fn(),
+  mockRecordFailure: vi.fn(),
+}));
 
 vi.mock("@/monitoring/prometheus", () => ({
   recordBroadcastSuccess: mockRecordSuccess,

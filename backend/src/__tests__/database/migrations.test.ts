@@ -54,7 +54,7 @@ describe("database migrations", () => {
 });
 
 async function createKnex(): Promise<Knex> {
-  const db = newDb({ autoCreateForeignKeyIndices: true });
+  const db = newDb({ autoCreateForeignKeyIndices: true, noAstCoverageCheck: true });
   db.public.registerFunction({
     name: "gen_random_uuid",
     returns: DataType.uuid,

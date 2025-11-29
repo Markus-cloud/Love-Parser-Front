@@ -21,21 +21,27 @@ vi.mock("@/middleware/getCurrentUser", () => ({
   }),
 }));
 
-const mockAssertActiveSubscription = vi.fn();
+const {
+  mockAssertActiveSubscription,
+  mockAddJob,
+  mockCreateSegment,
+  mockGetSegment,
+  mockUpdateSegment,
+} = vi.hoisted(() => ({
+  mockAssertActiveSubscription: vi.fn(),
+  mockAddJob: vi.fn(),
+  mockCreateSegment: vi.fn(),
+  mockGetSegment: vi.fn(),
+  mockUpdateSegment: vi.fn(),
+}));
 
 vi.mock("@/services/parsing/usage.service", () => ({
   assertActiveSubscription: mockAssertActiveSubscription,
 }));
 
-const mockAddJob = vi.fn();
-
 vi.mock("@/utils/queueHelpers", () => ({
   addJob: mockAddJob,
 }));
-
-const mockCreateSegment = vi.fn();
-const mockGetSegment = vi.fn();
-const mockUpdateSegment = vi.fn();
 
 vi.mock("@/services/audience/audienceService", () => ({
   createSegment: mockCreateSegment,

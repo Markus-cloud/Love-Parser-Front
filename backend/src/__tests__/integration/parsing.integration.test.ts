@@ -21,20 +21,33 @@ vi.mock("@/middleware/getCurrentUser", () => ({
   }),
 }));
 
-const mockAssertActiveSubscription = vi.fn();
-const mockAssertParsingQuotaAvailable = vi.fn();
-const mockIncrementParsingUsage = vi.fn();
+const {
+  mockAssertActiveSubscription,
+  mockAssertParsingQuotaAvailable,
+  mockIncrementParsingUsage,
+  mockCreateParsingSearch,
+  mockMergeParsingMetadata,
+  mockGetParsingResults,
+  mockGetAllParsedChannels,
+  mockSaveParsingProgress,
+  mockAddJob,
+} = vi.hoisted(() => ({
+  mockAssertActiveSubscription: vi.fn(),
+  mockAssertParsingQuotaAvailable: vi.fn(),
+  mockIncrementParsingUsage: vi.fn(),
+  mockCreateParsingSearch: vi.fn(),
+  mockMergeParsingMetadata: vi.fn(),
+  mockGetParsingResults: vi.fn(),
+  mockGetAllParsedChannels: vi.fn(),
+  mockSaveParsingProgress: vi.fn(),
+  mockAddJob: vi.fn(),
+}));
 
 vi.mock("@/services/parsing/usage.service", () => ({
   assertActiveSubscription: mockAssertActiveSubscription,
   assertParsingQuotaAvailable: mockAssertParsingQuotaAvailable,
   incrementParsingUsage: mockIncrementParsingUsage,
 }));
-
-const mockCreateParsingSearch = vi.fn();
-const mockMergeParsingMetadata = vi.fn();
-const mockGetParsingResults = vi.fn();
-const mockGetAllParsedChannels = vi.fn();
 
 vi.mock("@/services/parsing/parsing.service", () => ({
   createParsingSearch: mockCreateParsingSearch,
@@ -43,14 +56,10 @@ vi.mock("@/services/parsing/parsing.service", () => ({
   getAllParsedChannels: mockGetAllParsedChannels,
 }));
 
-const mockSaveParsingProgress = vi.fn();
-
 vi.mock("@/services/parsing/progress.service", () => ({
   saveParsingProgress: mockSaveParsingProgress,
   readParsingProgress: vi.fn().mockResolvedValue(null),
 }));
-
-const mockAddJob = vi.fn();
 
 vi.mock("@/utils/queueHelpers", () => ({
   addJob: mockAddJob,

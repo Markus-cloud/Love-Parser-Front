@@ -3,11 +3,19 @@ import type { Job } from "bull";
 
 import { handleAudienceJob } from "@/queue/jobHandlers/audience.handler";
 
-const mockGetSegment = vi.fn();
-const mockCalculateTotalRecipients = vi.fn();
-const mockInvalidateSegmentCache = vi.fn();
-const mockInvalidateDashboardCache = vi.fn();
-const queryMock = vi.fn();
+const {
+  mockGetSegment,
+  mockCalculateTotalRecipients,
+  mockInvalidateSegmentCache,
+  mockInvalidateDashboardCache,
+  queryMock,
+} = vi.hoisted(() => ({
+  mockGetSegment: vi.fn(),
+  mockCalculateTotalRecipients: vi.fn(),
+  mockInvalidateSegmentCache: vi.fn(),
+  mockInvalidateDashboardCache: vi.fn(),
+  queryMock: vi.fn(),
+}));
 
 vi.mock("@/services/audience/audienceService", () => ({
   getSegment: mockGetSegment,
