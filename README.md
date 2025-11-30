@@ -35,6 +35,8 @@ love-parser/
 | CI/CD runbook | [`docs/ci-cd.md`](./docs/ci-cd.md) | Workflows, secrets, blue/green deployments, rollback & smoke tests. |
 | Developer workflow | [`backend/DEV_GUIDE.md`](./backend/DEV_GUIDE.md) | Local setup, tests, code style, Git workflow. |
 
+См. [QUICK_START](./QUICK_START) для быстрого старта на русском языке.
+
 ## Requirements
 
 - Node.js 20+

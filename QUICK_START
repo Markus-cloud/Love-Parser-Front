@@ -1,0 +1,65 @@
+Love-Parser-Front — Telegram‑маркетинг: парсинг, аудитории, рассылки. Фронтенд (React 18 + Vite) взаимодействует с Fastify‑бэкендом, который собирает аудитории из Telegram, управляет рассылками и очередями Bull.
+
+1. Назначение проекта
+   - Веб-клиент и Telegram Mini App для сегментации аудиторий, настройки кампаний и мониторинга метрик.
+   - Работает поверх Love Parser API (порт 3000 по умолчанию) и повторно использует авторизацию Telegram.
+
+2. Системные требования
+   - Node.js 20 LTS (nvm/asdf: `nvm install 20 && nvm use 20`).
+   - Corepack + pnpm 9.12.2 (`corepack enable pnpm && corepack use pnpm@9.12.2`).
+   - npm 10.x (идёт в комплекте с Node 20) — используется скриптом `postinstall` для подпроектов.
+   - Git 2.40+.
+   - Docker + Docker Compose (опционально) для быстрого запуска PostgreSQL 15 и Redis 7, которые требуются backend`у; сам фронтенд не ходит в БД напрямую, но без API функциональность ограничена.
+
+3. Подготовка окружения
+   1) Клонируйте репозиторий: `git clone git@github.com:ORG/Love-Parser-Front.git && cd Love-Parser-Front`.
+   2) Включите Corepack и выберите версию pnpm: `corepack enable pnpm && corepack use pnpm@9.12.2`.
+   3) Установите зависимости: `pnpm install`. Скрипт подтянет node_modules для корня, backend и frontend.
+   4) Подготовьте backend (для локального API): `cd backend && cp .env.example .env && pnpm dev` либо `docker compose up` (PostgreSQL + Redis + API на 3000 порту). В `.env` backend`а пропишите `FRONTEND_URL=http://localhost:8080` и `CORS_ORIGIN=http://localhost:8080`.
+   5) Вернитесь в корень (`cd ..`) для запуска фронтенда.
+
+4. Настройка переменных окружения (frontend/.env или frontend/.env.local)
+   - Обязательные переменные:
+     - `VITE_API_URL` — базовый URL Love Parser API; должен совпадать с адресом backend`а (например, `http://localhost:3000`).
+   - Дополнительные переменные:
+     - `API_URL` — fallback для серверных сборок/тестов (используется, если `VITE_API_URL` не задан).
+     - `VITE_APP_NAME` — опциональный бренд в интерфейсе.
+   - Пример файла:
+     ```env
+     VITE_API_URL=http://localhost:3000
+     # API_URL=http://localhost:3000
+     # VITE_APP_NAME=Love Parser Dev
+     ```
+   - Никогда не коммитьте реальные ключи; создавайте `.env.local` и добавляйте его в `.gitignore`.
+
+5. Запуск в режиме разработки
+   1) Убедитесь, что backend и его PostgreSQL/Redis запущены (`pnpm dev:backend` или `docker compose up` из каталога backend).
+   2) Стартуйте фронтенд: `pnpm dev:frontend` (или `pnpm dev`, чтобы поднять backend + frontend одновременно). Vite слушает `http://localhost:8080` (см. `frontend/vite.config.ts`).
+   3) После запуска авторизуйтесь через Telegram Mini App или через браузер; все запросы идут на `VITE_API_URL`.
+   - Типичные проблемы и решения:
+     - Отсутствует `.env` → создайте `frontend/.env` из примера, иначе Vite не соберёт проект.
+     - Неверный `VITE_API_URL` → приводит к 404/401 в браузере; проверьте Network в DevTools и обновите значение.
+     - CORS ошибки → синхронизируйте `FRONTEND_URL`/`CORS_ORIGIN` backend`а с фактическим адресом фронта.
+     - Backend не запущен → получите `ERR_CONNECTION_REFUSED`; поднимите `pnpm dev:backend` и убедитесь, что PostgreSQL/Redis доступны.
+
+6. Сборка и запуск в production-режиме локально
+   1) Соберите клиент: `pnpm --filter @love-parser/frontend build` (или `pnpm build:frontend`). Артефакты появятся в `frontend/dist`.
+   2) Проверьте production-сборку: `pnpm --filter @love-parser/frontend preview -- --host 0.0.0.0 --port 4173`.
+   - Для деплоя скопируйте содержимое `frontend/dist` на любой статический хостинг или в каталог, обслуживаемый Nginx/Apache. Настройте reverse proxy, чтобы статика отдавалась по HTTPS, а API-прослойка проксировала запросы на backend (порт 3000 или внешний адрес).
+   - Перед сборкой пропишите корректный `VITE_API_URL` (например, `https://api.loveparser.ru`), иначе адрес API «зашьётся» неправильно. На backend`е обновите `FRONTEND_URL` и `CORS_ORIGIN`, чтобы разрешить новый домен.
+   - Для production-релизов рекомендуется поставить фронтенд за Nginx/Traefik с gzip/HTTP2, а backend спрятать за upstream`ом и настроить health‑check очередей Bull.
+
+7. Структура проекта
+   - `frontend/src` — страницы, роуты, UI-компоненты и клиентские хуки.
+   - `backend/src` — Fastify API, сервисы и интеграции.
+   - `backend/src/routes` — HTTP-маршруты, включая `/audience` (см. `backend/src/routes/audience.ts`).
+   - `backend/src/services` — бизнес-логика; `audienceService` хранится в `backend/src/services/audience/audienceService.ts`.
+   - `backend/src/jobs/cron` — задания cron (очистка логов, проверки подписок) инициализируются Bull.
+   - `backend/src/queue/jobHandlers` — обработчики Bull-задач, например `audience.handler.ts` для `JobTypes.AUDIENCE_SEGMENT`.
+   - `backend/src/queue/cronScheduler.ts` — регистрирует repeatable jobs и запускает их по расписанию.
+
+8. Частые ошибки и отладка
+   - 4xx/5xx от backend`а → проверьте корректность `VITE_API_URL` и токена, откройте DevTools → Network, а затем изучите логи backend`а (`backend/logs/app.log` или консоль при `pnpm dev:backend`).
+   - Логи находятся в `backend/logs` (ротация через `winston-daily-rotate-file`); для живых логов держите `pnpm dev:backend` в отдельном терминале.
+   - Для более подробного логирования запустите backend с `NODE_ENV=development` (значение по умолчанию) — Winston будет писать `debug` как в консоль, так и в файлы.
+   - Если очередь Bull или cron-задачи зависли, проверьте `backend/src/queue/cronScheduler.ts`, убедитесь, что Redis доступен (`redis://localhost:6379` по умолчанию) и перезапустите воркеры (`pnpm dev:backend`).
